@@ -4,9 +4,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
-	"path/filepath"
 
 	rss "black/go-pkg-rss-custom"
 )
@@ -68,7 +68,7 @@ func processImage(ch *rss.Channel) {
 	logger.Debug.Println("Download image : " + ch.Image.Url)
 	if len(ch.Image.Url) > 0 {
 		imagepath := downloadFromUrl(ch.Image.Url, targetFolder)
-		convertImage(imagepath, filepath.Join(targetFolder , "folder.jpg"))
+		convertImage(imagepath, filepath.Join(targetFolder, "folder.jpg"))
 	}
 	defer wg.Done()
 
