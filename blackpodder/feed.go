@@ -10,11 +10,13 @@ import (
 	"sync"
 	"time"
 
-	rss "black/go-pkg-rss-custom"
-	"github.com/jteeuwen/go-pkg-xmlx"
+	rss "github.com/jteeuwen/go-pkg-rss"
+
+	xmlx "github.com/jteeuwen/go-pkg-xmlx"
 )
 
 func PollFeed(uri string, timeout int, cr xmlx.CharsetFunc, wg *sync.WaitGroup) {
+	defer wg.Done()
 	feed := rss.New(timeout, true, chanHandler, itemHandler)
 	if err := feed.Fetch(uri, cr); err != nil {
 		fmt.Fprintf(os.Stderr, "[e] %s: %s", uri, err)
@@ -22,9 +24,7 @@ func PollFeed(uri string, timeout int, cr xmlx.CharsetFunc, wg *sync.WaitGroup) 
 	}
 	//<-time.After(time.Duration(feed.SecondsTillUpdate() * 1e9))
 	logger.Info.Println("End of feed function")
-	defer wg.Done()
 }
-
 
 func charsetReader(charset string, r io.Reader) (io.Reader, error) {
 	if charset == "ISO-8859-1" || charset == "iso-8859-1" {

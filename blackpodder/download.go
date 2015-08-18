@@ -17,17 +17,17 @@ func downloadFromUrl(url string, folder string) (path string) {
 	// TODO: check file existence first with io.IsExist
 	output, err := os.Create(fileName)
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
 	}
 	defer output.Close()
 	response, err := http.Get(url)
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
 	}
 	defer response.Body.Close()
 	n, err := io.Copy(output, response.Body)
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
 	}
 	fmt.Println(n, "bytes downloaded.")
 	return fileName

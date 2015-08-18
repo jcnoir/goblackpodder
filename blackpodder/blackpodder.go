@@ -3,30 +3,35 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 
-	rss "black/go-pkg-rss-custom"
+	rss "github.com/jteeuwen/go-pkg-rss"
 )
 
 var (
 	logger       Logger
 	wg           sync.WaitGroup
 	targetFolder string
+	feedsPath    string
 )
 
 func main() {
 	logger = NewLogger()
 	targetFolder = "/tmp/test-podcasts"
+	user, _ := user.Current()
+	feedsPath = filepath.Join(user.HomeDir, ".blackpod", "feeds.dev")
 	os.MkdirAll(targetFolder, 0777)
 	logger.Info.Println("Blackpodder starts")
-	feed("http://lhspodcast.info/category/podcast-ogg/feed")
-	feed("http://feed.ubuntupodcast.org/ogg")
-	feed("http://feeds.feedburner.com/systemau-ogg")
-	feed("http://hanselminutes.com/subscribearchives")
-	feed("http://feeds.feedburner.com/PuppetLabsPodcast")
+	feeds := parseFeeds(feedsPath)
+	for _, feed := range feeds {
+		downloadFeed(feed)
+	}
 
 	logger.Debug.Println("Before wait")
 	wg.Wait()
@@ -34,7 +39,7 @@ func main() {
 	logger.Info.Println("Blackpodder stops")
 }
 
-func feed(url string) {
+func downloadFeed(url string) {
 	wg.Add(1)
 	go PollFeed(url, 5, charsetReader, &wg)
 }
@@ -42,12 +47,13 @@ func feed(url string) {
 func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 
 	fmt.Printf("%d new item(s) in %s\n", len(newitems), feed.Url)
-	var slice []*rss.Item = newitems[0:1]
+	var slice []*rss.Item = newitems[0:5]
 	for i, item := range slice {
 		fmt.Println(strconv.Itoa(i)+":Title :", item.Title)
 		fmt.Println(", Date :", item.PubDate)
 		pubtime, _ := parseTime(item.PubDate)
 		fmt.Println(", Date :", pubtime)
+		fmt.Println("Found enclosures : " ,len(item.Enclosures))
 		if len(item.Enclosures) > 0 {
 			selectedEnclosure := selectEnclosure(item)
 			wg.Add(1)
@@ -65,19 +71,22 @@ func chanHandler(feed *rss.Feed, newchannels []*rss.Channel) {
 }
 
 func processImage(ch *rss.Channel) {
+	defer wg.Done()
 	logger.Debug.Println("Download image : " + ch.Image.Url)
 	if len(ch.Image.Url) > 0 {
 		imagepath := downloadFromUrl(ch.Image.Url, targetFolder)
-		convertImage(imagepath, filepath.Join(targetFolder, "folder.jpg"))
+
+		//		convertImage(imagepath, filepath.Join(targetFolder, "folder.jpg"))
+		convertImage(imagepath, filepath.Join(targetFolder, filepath.Base(imagepath)+".jpg"))
+
 	}
-	defer wg.Done()
 
 }
 
 func process(selectedEnclosure *rss.Enclosure) {
+	defer wg.Done()
 	downloadFromUrl(selectedEnclosure.Url, targetFolder)
 	logger.Info.Println("selected enclosure : " + selectedEnclosure.Url)
-	defer wg.Done()
 }
 
 func selectEnclosure(item *rss.Item) *rss.Enclosure {
@@ -93,10 +102,19 @@ func selectEnclosure(item *rss.Item) *rss.Enclosure {
 func convertImage(inputFile string, outputFile string) {
 	inputImage, err := ImageRead(inputFile)
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
 	}
 	err = Formatjpg(inputImage, outputFile)
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
 	}
+}
+
+func parseFeeds(filePath string) []string {
+	content, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	lines := strings.Split(string(content), "\n")
+	return lines
 }
