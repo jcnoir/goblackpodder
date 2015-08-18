@@ -19,18 +19,22 @@ var (
 	wg           sync.WaitGroup
 	targetFolder string
 	feedsPath    string
+	maxEpisodes  int
 )
 
 func main() {
 	logger = NewLogger()
 	targetFolder = "/tmp/test-podcasts"
+	maxEpisodes = 2
 	user, _ := user.Current()
 	feedsPath = filepath.Join(user.HomeDir, ".blackpod", "feeds.dev")
 	os.MkdirAll(targetFolder, 0777)
 	logger.Info.Println("Blackpodder starts")
-	feeds := parseFeeds(feedsPath)
-	for _, feed := range feeds {
-		downloadFeed(feed)
+	feeds, err := parseFeeds(feedsPath)
+	if err == nil {
+		for _, feed := range feeds {
+			downloadFeed(feed)
+		}
 	}
 
 	logger.Debug.Println("Before wait")
@@ -47,7 +51,7 @@ func downloadFeed(url string) {
 func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 
 	fmt.Printf("%d new item(s) in %s\n", len(newitems), feed.Url)
-	var slice []*rss.Item = newitems[0:5]
+	var slice []*rss.Item = newitems[0:maxEpisodes]
 	for i, item := range slice {
 		fmt.Println(strconv.Itoa(i)+":Title :", item.Title)
 		fmt.Println(", Date :", item.PubDate)
@@ -74,19 +78,24 @@ func processImage(ch *rss.Channel) {
 	defer wg.Done()
 	logger.Debug.Println("Download image : " + ch.Image.Url)
 	if len(ch.Image.Url) > 0 {
-		imagepath := downloadFromUrl(ch.Image.Url, targetFolder)
-
-		//		convertImage(imagepath, filepath.Join(targetFolder, "folder.jpg"))
-		convertImage(imagepath, filepath.Join(targetFolder, filepath.Base(imagepath)+".jpg"))
-
+		imagepath, err := downloadFromUrl(ch.Image.Url, targetFolder)
+		if err == nil {
+			//		convertImage(imagepath, filepath.Join(targetFolder, "folder.jpg"))
+			convertImage(imagepath, filepath.Join(targetFolder, filepath.Base(imagepath)+".jpg"))
+		} else {
+			logger.Error.Println("Podacast image processing failure", err)
+		}
 	}
-
 }
 
 func process(selectedEnclosure *rss.Enclosure) {
 	defer wg.Done()
-	downloadFromUrl(selectedEnclosure.Url, targetFolder)
-	logger.Info.Println("selected enclosure : " + selectedEnclosure.Url)
+	filepath, err := downloadFromUrl(selectedEnclosure.Url, targetFolder)
+	if err == nil {
+		logger.Info.Println("Episode downloaded", filepath)
+	} else {
+		logger.Error.Println("Episode download failure", err)
+	}
 }
 
 func selectEnclosure(item *rss.Item) *rss.Enclosure {
@@ -99,22 +108,21 @@ func selectEnclosure(item *rss.Item) *rss.Enclosure {
 	return selectedEnclosure
 }
 
-func convertImage(inputFile string, outputFile string) {
+func convertImage(inputFile string, outputFile string) error {
 	inputImage, err := ImageRead(inputFile)
-	if err != nil {
-		fmt.Println(err)
+	if err == nil {
+		err = Formatjpg(inputImage, outputFile)
 	}
-	err = Formatjpg(inputImage, outputFile)
-	if err != nil {
-		fmt.Println(err)
-	}
+	return err
+
 }
 
-func parseFeeds(filePath string) []string {
+func parseFeeds(filePath string) ([]string, error) {
+	var lines []string
 	content, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		fmt.Println(err)
+	if err == nil {
+		lines = strings.Split(string(content), "\n")
 	}
-	lines := strings.Split(string(content), "\n")
-	return lines
+	return lines, err
+
 }

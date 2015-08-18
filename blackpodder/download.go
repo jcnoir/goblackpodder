@@ -7,9 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"github.com/pivotal-golang/bytefmt" 
 )
 
-func downloadFromUrl(url string, folder string) (path string) {
+func downloadFromUrl(url string, folder string) (path string, err error) {
 	tokens := strings.Split(url, "/")
 	fileName := tokens[len(tokens)-1]
 	fileName = filepath.Join(folder, fileName)
@@ -17,18 +18,18 @@ func downloadFromUrl(url string, folder string) (path string) {
 	// TODO: check file existence first with io.IsExist
 	output, err := os.Create(fileName)
 	if err != nil {
-		fmt.Println(err)
+		return fileName, err
 	}
 	defer output.Close()
 	response, err := http.Get(url)
 	if err != nil {
-		fmt.Println(err)
+		return fileName, err
 	}
 	defer response.Body.Close()
 	n, err := io.Copy(output, response.Body)
 	if err != nil {
-		fmt.Println(err)
+		return fileName, err
 	}
-	fmt.Println(n, "bytes downloaded.")
-	return fileName
+	fmt.Println(bytefmt.ByteSize(uint64(n)), " downloaded for " +url)
+	return fileName, err
 }
