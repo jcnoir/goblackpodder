@@ -23,7 +23,6 @@ func PollFeed(uri string, timeout int, cr xmlx.CharsetFunc, wg *sync.WaitGroup) 
 		return
 	}
 	//<-time.After(time.Duration(feed.SecondsTillUpdate() * 1e9))
-	logger.Info.Println("End of feed function")
 }
 
 func charsetReader(charset string, r io.Reader) (io.Reader, error) {

@@ -37,9 +37,7 @@ func main() {
 		}
 	}
 
-	logger.Debug.Println("Before wait")
 	wg.Wait()
-	logger.Debug.Println("After wait")
 	logger.Info.Println("Blackpodder stops")
 }
 
@@ -54,9 +52,6 @@ func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 	var slice []*rss.Item = newitems[0:maxEpisodes]
 	for i, item := range slice {
 		fmt.Println(strconv.Itoa(i)+":Title :", item.Title)
-		fmt.Println(", Date :", item.PubDate)
-		pubtime, _ := parseTime(item.PubDate)
-		fmt.Println(", Date :", pubtime)
 		fmt.Println("Found enclosures : ", len(item.Enclosures))
 		if len(item.Enclosures) > 0 {
 			selectedEnclosure := selectEnclosure(item)
@@ -76,7 +71,7 @@ func chanHandler(feed *rss.Feed, newchannels []*rss.Channel) {
 
 func processImage(ch *rss.Channel) {
 	defer wg.Done()
-	logger.Debug.Println("Download image : " + ch.Image.Url)
+	logger.Debug.Println("rDownload image : " + ch.Image.Url)
 	if len(ch.Image.Url) > 0 {
 		imagepath, err := downloadFromUrl(ch.Image.Url, targetFolder)
 		if err == nil {
@@ -111,7 +106,11 @@ func selectEnclosure(item *rss.Item) *rss.Enclosure {
 func convertImage(inputFile string, outputFile string) error {
 	inputImage, err := ImageRead(inputFile)
 	if err == nil {
-		err = Formatjpg(inputImage, outputFile)
+		if _, err := os.Stat(outputFile); err != nil {
+			err = Formatjpg(inputImage, outputFile)
+		} else {
+			logger.Debug.Println("Skipping the image conversion since it already exists", outputFile)
+		}
 	}
 	return err
 
