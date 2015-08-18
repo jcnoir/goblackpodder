@@ -25,7 +25,7 @@ var (
 func main() {
 	logger = NewLogger()
 	targetFolder = "/tmp/test-podcasts"
-	maxEpisodes = 10
+	maxEpisodes = 1
 	user, _ := user.Current()
 	feedsPath = filepath.Join(user.HomeDir, ".blackpod", "feeds.dev")
 	os.MkdirAll(targetFolder, 0777)
