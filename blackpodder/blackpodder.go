@@ -71,7 +71,7 @@ func chanHandler(feed *rss.Feed, newchannels []*rss.Channel) {
 
 func processImage(ch *rss.Channel) {
 	defer wg.Done()
-	logger.Debug.Println("rDownload image : " + ch.Image.Url)
+	logger.Debug.Println("Download image : " + ch.Image.Url)
 	if len(ch.Image.Url) > 0 {
 		imagepath, err := downloadFromUrl(ch.Image.Url, targetFolder)
 		if err == nil {
