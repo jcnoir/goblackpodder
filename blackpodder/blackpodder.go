@@ -53,7 +53,7 @@ func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 		fmt.Println(", Date :", item.PubDate)
 		pubtime, _ := parseTime(item.PubDate)
 		fmt.Println(", Date :", pubtime)
-		fmt.Println("Found enclosures : " ,len(item.Enclosures))
+		fmt.Println("Found enclosures : ", len(item.Enclosures))
 		if len(item.Enclosures) > 0 {
 			selectedEnclosure := selectEnclosure(item)
 			wg.Add(1)

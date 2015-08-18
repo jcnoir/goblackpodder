@@ -5,8 +5,8 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strings"
 	"path/filepath"
+	"strings"
 )
 
 func downloadFromUrl(url string, folder string) (path string) {
