@@ -16,8 +16,9 @@ func downloadFromUrl(url string, folder string) (path string, err error) {
 	fileName := tokens[len(tokens)-1]
 	fileName = filepath.Join(folder, fileName)
 	tmpFilename := fileName + ".part"
+	defer removeTempFile(tmpFilename)
 
-	if _, err3 := os.Stat(fileName); err3 != nil {
+	if ! pathExists(fileName) {
 		fmt.Println(url, " --> ", fileName)
 		// TODO: check file existence first with io.IsExist
 		output, err := os.Create(tmpFilename)
@@ -43,9 +44,12 @@ func downloadFromUrl(url string, folder string) (path string, err error) {
 	} else {
 		logger.Debug.Println("No download since the file exists", fileName)
 	}
-	if _, err2 := os.Stat(tmpFilename); err2 != nil {
-		os.Remove(tmpFilename)
-	}
 
 	return fileName, err
+}
+
+func removeTempFile(tmpFilename string) {
+	if pathExists(tmpFilename) {
+		os.Remove(tmpFilename)
+	}
 }

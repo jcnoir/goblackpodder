@@ -25,7 +25,7 @@ var (
 func main() {
 	logger = NewLogger()
 	targetFolder = "/tmp/test-podcasts"
-	maxEpisodes = 1
+	maxEpisodes = 10
 	user, _ := user.Current()
 	feedsPath = filepath.Join(user.HomeDir, ".blackpod", "feeds.dev")
 	os.MkdirAll(targetFolder, 0777)
@@ -91,7 +91,7 @@ func process(selectedEnclosure *rss.Enclosure, folder string) {
 	if err == nil {
 		logger.Info.Println("Episode downloaded", filepath)
 	} else {
-		logger.Error.Println("Episode download failure : " +selectedEnclosure.Url, err)
+		logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
 	}
 }
 
@@ -108,7 +108,7 @@ func selectEnclosure(item *rss.Item) *rss.Enclosure {
 func convertImage(inputFile string, outputFile string) error {
 	inputImage, err := ImageRead(inputFile)
 	if err == nil {
-		if _, err := os.Stat(outputFile); err != nil {
+		if !pathExists(outputFile) {
 			err = Formatjpg(inputImage, outputFile)
 		} else {
 			logger.Debug.Println("Skipping the image conversion since it already exists", outputFile)
