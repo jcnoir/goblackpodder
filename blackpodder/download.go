@@ -18,28 +18,36 @@ func downloadFromUrl(url string, folder string) (path string, err error) {
 	tmpFilename := fileName + ".part"
 	defer removeTempFile(tmpFilename)
 
-	if ! pathExists(fileName) {
+	if !pathExists(fileName) {
 		fmt.Println(url, " --> ", fileName)
 		// TODO: check file existence first with io.IsExist
 		output, err := os.Create(tmpFilename)
-		if err == nil {
-			defer output.Close()
-			client := &http.Client{}
-			req, err := http.NewRequest("GET", url, nil)
-			if err == nil {
-				req.Header.Add("Accept-Encoding", "identity")
-				req.Close = true
-				response, err := client.Do(req)
-				if err == nil {
-					defer response.Body.Close()
-					n, err := io.Copy(output, response.Body)
-					if err == nil {
-						fmt.Println(bytefmt.ByteSize(uint64(n)), " downloaded for "+url)
-						os.Rename(tmpFilename, fileName)
-					}
-				}
-			}
+		if err != nil {
+			return fileName, err
+
 		}
+		defer output.Close()
+		client := &http.Client{}
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return fileName, err
+
+		}
+		req.Header.Add("Accept-Encoding", "identity")
+		req.Close = true
+		response, err := client.Do(req)
+		if err != nil {
+			return fileName, err
+
+		}
+		defer response.Body.Close()
+		n, err := io.Copy(output, response.Body)
+		if err != nil {
+			return fileName, err
+
+		}
+		fmt.Println(bytefmt.ByteSize(uint64(n)), " downloaded for "+url)
+		os.Rename(tmpFilename, fileName)
 
 	} else {
 		logger.Debug.Println("No download since the file exists", fileName)
