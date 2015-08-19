@@ -3,7 +3,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -19,7 +18,7 @@ func PollFeed(uri string, timeout int, cr xmlx.CharsetFunc, wg *sync.WaitGroup) 
 	defer wg.Done()
 	feed := rss.New(timeout, true, chanHandler, itemHandler)
 	if err := feed.Fetch(uri, cr); err != nil {
-		fmt.Fprintf(os.Stderr, "[e] %s: %s", uri, err)
+		logger.Info.Println(os.Stderr, "[e] %s: %s", uri, err)
 		return
 	}
 	//<-time.After(time.Duration(feed.SecondsTillUpdate() * 1e9))

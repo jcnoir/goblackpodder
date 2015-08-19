@@ -2,7 +2,6 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -12,6 +11,7 @@ import (
 	"sync"
 
 	rss "github.com/jteeuwen/go-pkg-rss"
+	viper "github.com/spf13/viper"
 )
 
 var (
@@ -20,25 +20,28 @@ var (
 	targetFolder string
 	feedsPath    string
 	maxEpisodes  int
+	verbose      bool
 )
 
 func main() {
-	logger = NewLogger()
-	targetFolder = "/tmp/test-podcasts"
-	maxEpisodes = 1
-	user, _ := user.Current()
-	feedsPath = filepath.Join(user.HomeDir, ".blackpod", "feeds.dev")
-	os.MkdirAll(targetFolder, 0777)
-	logger.Info.Println("Blackpodder starts")
+	readConfig()
+	logger = NewLogger(verbose)
+	err := os.MkdirAll(targetFolder, 0777)
+	if err != nil {
+		logger.Error.Panic("Cannot create the target folder : "+targetFolder+" : ", err)
+	}
+	logger.Info.Println("Podcast Update ...")
 	feeds, err := parseFeeds(feedsPath)
 	if err == nil {
 		for _, feed := range feeds {
 			downloadFeed(feed)
 		}
+	} else {
+		logger.Error.Println("Cannot parse feed file : ", err)
 	}
 
 	wg.Wait()
-	logger.Info.Println("Blackpodder stops")
+	logger.Info.Println("Podcast Update Completed")
 }
 
 func downloadFeed(url string) {
@@ -48,7 +51,7 @@ func downloadFeed(url string) {
 
 func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 
-	fmt.Printf("%d new item(s) in %s\n", len(newitems), feed.Url)
+	logger.Debug.Println(strconv.Itoa(len(newitems)) + " available episodes for " + ch.Title)
 
 	podcastFolder := filepath.Join(targetFolder, ch.Title)
 	os.MkdirAll(podcastFolder, 0777)
@@ -56,20 +59,26 @@ func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 	wg.Add(1)
 	go processImage(ch, podcastFolder)
 
-	var slice []*rss.Item = newitems[0:maxEpisodes]
-	for i, item := range slice {
-		fmt.Println(strconv.Itoa(i)+":Title :", item.Title)
-		fmt.Println("Found enclosures : ", len(item.Enclosures))
-		if len(item.Enclosures) > 0 {
-			selectedEnclosure := selectEnclosure(item)
-			wg.Add(1)
-			go process(selectedEnclosure, podcastFolder)
+	episodeCounter := 0
+
+	for _, item := range newitems {
+		selectedEnclosure := selectEnclosure(item)
+		if selectedEnclosure != nil {
+			if len(item.Enclosures) > 0 {
+				episodeCounter += 1
+				wg.Add(1)
+				go process(selectedEnclosure, podcastFolder)
+				if episodeCounter >= maxEpisodes {
+					break
+				}
+			}
+		} else {
+			logger.Warning.Println("No audio found for episode " + ch.Title + " - " + item.Title)
 		}
 	}
 }
 
 func chanHandler(feed *rss.Feed, newchannels []*rss.Channel) {
-	fmt.Printf("%d new channel(s) in %s\n", len(newchannels), feed.Url)
 }
 
 func processImage(ch *rss.Channel, folder string) {
@@ -87,19 +96,20 @@ func processImage(ch *rss.Channel, folder string) {
 
 func process(selectedEnclosure *rss.Enclosure, folder string) {
 	defer wg.Done()
-	filepath, err := downloadFromUrl(selectedEnclosure.Url, folder)
-	if err == nil {
-		logger.Info.Println("Episode downloaded", filepath)
-	} else {
+	_, err := downloadFromUrl(selectedEnclosure.Url, folder)
+	if err != nil {
 		logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
 	}
 }
 
 func selectEnclosure(item *rss.Item) *rss.Enclosure {
-	selectedEnclosure := item.Enclosures[0]
-	for _, enclosure := range item.Enclosures {
-		if enclosure.Length > selectedEnclosure.Length {
-			selectedEnclosure = enclosure
+	var selectedEnclosure *rss.Enclosure
+
+	if len(item.Enclosures) > 0 {
+		for _, enclosure := range item.Enclosures {
+			if strings.Contains(enclosure.Type, "audio") && (selectedEnclosure == nil || enclosure.Length > selectedEnclosure.Length) {
+				selectedEnclosure = enclosure
+			}
 		}
 	}
 	return selectedEnclosure
@@ -126,4 +136,30 @@ func parseFeeds(filePath string) ([]string, error) {
 	}
 	return lines, err
 
+}
+
+func readConfig() {
+
+	user, _ := user.Current()
+	configFolder := filepath.Join(user.HomeDir, ".blackpod")
+
+	viper.SetConfigName("config")
+	viper.AddConfigPath(configFolder)
+
+	viper.SetDefault("feeds", filepath.Join(configFolder, "feeds.dev"))
+	viper.SetDefault("directory", "/tmp/test-podcasts")
+	viper.SetDefault("episodes", 1)
+	viper.SetDefault("verbose", false)
+
+	err := viper.ReadInConfig()
+	if err != nil {
+		logger.Error.Println("Fatal error config file: %s \n", err)
+	}
+	if verbose {
+		viper.Debug()
+	}
+	targetFolder = viper.GetString("directory")
+	feedsPath = viper.GetString("feeds")
+	maxEpisodes = viper.GetInt("episodes")
+	verbose = viper.GetBool("verbose")
 }

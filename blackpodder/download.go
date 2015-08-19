@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -16,10 +15,11 @@ func downloadFromUrl(url string, folder string) (path string, err error) {
 	fileName := tokens[len(tokens)-1]
 	fileName = filepath.Join(folder, fileName)
 	tmpFilename := fileName + ".part"
+	resourceName := filepath.Base(folder) + " - " + filepath.Base(fileName)
 	defer removeTempFile(tmpFilename)
 
 	if !pathExists(fileName) {
-		fmt.Println(url, " --> ", fileName)
+		logger.Info.Println("New resource available : " + resourceName)
 		// TODO: check file existence first with io.IsExist
 		output, err := os.Create(tmpFilename)
 		if err != nil {
@@ -46,7 +46,7 @@ func downloadFromUrl(url string, folder string) (path string, err error) {
 			return fileName, err
 
 		}
-		fmt.Println(bytefmt.ByteSize(uint64(n)), " downloaded for "+url)
+		logger.Info.Println("Resource downloaded : " + resourceName + "(" + bytefmt.ByteSize(uint64(n)) + ")")
 		os.Rename(tmpFilename, fileName)
 
 	} else {
