@@ -2,10 +2,10 @@
 package main
 
 import (
-	"log"
-	"os"
 	"io"
 	"io/ioutil"
+	"log"
+	"os"
 )
 
 type Logger struct {
@@ -28,8 +28,8 @@ func NewLogger(verbose bool) Logger {
 	logger := Logger{
 		Debug:   log.New(verboseOut, "TRACE    : ", log.Ldate|log.Ltime|log.Lshortfile),
 		Info:    log.New(os.Stdout, "", 0),
-		Warning: log.New(os.Stdout, "WARNING : ", log.Ldate|log.Ltime|log.Lshortfile),
-		Error:   log.New(os.Stderr, "ERROR   : ", log.Ldate|log.Ltime|log.Lshortfile),
+		Warning: log.New(os.Stdout, "WARNING : ", 0),
+		Error:   log.New(os.Stderr, "ERROR   : ", 0),
 	}
 	return logger
 }

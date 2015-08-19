@@ -46,7 +46,7 @@ func downloadFromUrl(url string, folder string) (path string, err error) {
 			return fileName, err
 
 		}
-		logger.Info.Println("Resource downloaded : " + resourceName + "(" + bytefmt.ByteSize(uint64(n)) + ")")
+		logger.Info.Println("Resource downloaded : " + resourceName + " (" + bytefmt.ByteSize(uint64(n)) + ")")
 		os.Rename(tmpFilename, fileName)
 
 	} else {
