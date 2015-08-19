@@ -89,7 +89,7 @@ func processImage(ch *rss.Channel, folder string) {
 		if err == nil {
 			convertImage(imagepath, filepath.Join(folder, "folder.jpg"))
 		} else {
-			logger.Error.Println("Podacast image processing failure", err)
+			logger.Error.Println("Podcast image processing failure", err)
 		}
 	}
 }
@@ -123,6 +123,8 @@ func convertImage(inputFile string, outputFile string) error {
 		} else {
 			logger.Debug.Println("Skipping the image conversion since it already exists", outputFile)
 		}
+	} else {
+		logger.Error.Println("Cannot convert podcast image : "+inputFile, err)
 	}
 	return err
 
