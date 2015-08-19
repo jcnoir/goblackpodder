@@ -1,0 +1,4 @@
+#verbose = true
+#feeds = "/home/jcnoir/.blackpod/feeds.dev"
+#directory = "/media/nas/podcasts"
+#episodes = 3
