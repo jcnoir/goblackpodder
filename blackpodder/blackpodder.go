@@ -2,6 +2,7 @@
 package main
 
 import (
+	"black/go-taglib"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -67,7 +68,7 @@ func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 			if len(item.Enclosures) > 0 {
 				episodeCounter += 1
 				wg.Add(1)
-				go process(selectedEnclosure, podcastFolder)
+				go process(selectedEnclosure, podcastFolder, item, ch)
 				if episodeCounter >= maxEpisodes {
 					break
 				}
@@ -94,9 +95,10 @@ func processImage(ch *rss.Channel, folder string) {
 	}
 }
 
-func process(selectedEnclosure *rss.Enclosure, folder string) {
+func process(selectedEnclosure *rss.Enclosure, folder string, item *rss.Item, channel *rss.Channel) {
 	defer wg.Done()
-	_, err := downloadFromUrl(selectedEnclosure.Url, folder)
+	file, err := downloadFromUrl(selectedEnclosure.Url, folder)
+	completeTags(file, item, channel)
 	if err != nil {
 		logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
 	}
@@ -164,4 +166,52 @@ func readConfig() {
 	feedsPath = viper.GetString("feeds")
 	maxEpisodes = viper.GetInt("episodes")
 	verbose = viper.GetBool("verbose")
+}
+
+func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
+	tag, err := taglib.Read(episodeFile)
+	modified := 0
+	if err != nil {
+		logger.Warning.Println("Cannot complete episode tags for " + podcast.Title + " - " + episode.Title)
+	}
+
+	if tag.Artist() == "" {
+		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing artist tag --> " + podcast.Title)
+		tag.SetArtist(podcast.Title)
+		modified += 1
+	}
+	if tag.Album() == "" {
+		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing album tag --> " + podcast.Title)
+		tag.SetAlbum(podcast.Title)
+		modified += 1
+	}
+	if tag.Comment() == "" {
+		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing comment tag --> " + episode.Description)
+		tag.SetComment(episode.Description)
+		modified += 1
+	}
+	if tag.Title() == "" {
+		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing title tag --> " + episode.Title)
+		tag.SetTitle(episode.Title)
+		modified += 1
+	}
+	if tag.Genre() == "" {
+		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing genre tag --> " + "Podcast")
+		tag.SetGenre("Podcast")
+		modified += 1
+	}
+	if tag.Year() == 0 {
+		pubdate, err := episode.ParsedPubDate()
+		if err == nil {
+			logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing year tag --> " + strconv.Itoa(pubdate.Year()))
+			tag.SetYear(pubdate.Year())
+			modified += 1
+		}
+	}
+	if modified > 0 {
+		if !tag.Save() {
+			logger.Warning.Println(podcast.Title + " - " + episode.Title + " : Cannot save the modified tags")
+		}
+	}
+
 }
