@@ -98,9 +98,10 @@ func processImage(ch *rss.Channel, folder string) {
 func process(selectedEnclosure *rss.Enclosure, folder string, item *rss.Item, channel *rss.Channel) {
 	defer wg.Done()
 	file, err := downloadFromUrl(selectedEnclosure.Url, folder)
-	completeTags(file, item, channel)
 	if err != nil {
 		logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
+	} else {
+		completeTags(file, item, channel)
 	}
 }
 
@@ -173,6 +174,7 @@ func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
 	modified := 0
 	if err != nil {
 		logger.Warning.Println("Cannot complete episode tags for " + podcast.Title + " - " + episode.Title)
+		return
 	}
 
 	if tag.Artist() == "" {
@@ -212,6 +214,7 @@ func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
 		if !tag.Save() {
 			logger.Warning.Println(podcast.Title + " - " + episode.Title + " : Cannot save the modified tags")
 		}
+		defer tag.Close()
 	}
 
 }
