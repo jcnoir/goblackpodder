@@ -27,6 +27,7 @@ var (
 	maxFeedRunner    int
 	maxImageRunner   int
 	maxEpisodeRunner int
+	maxRetryDownload int
 	episodeTasks     chan episodeTask
 	imageTasks       chan imageTask
 	feedTasks        chan string
@@ -142,7 +143,7 @@ func chanHandler(feed *rss.Feed, newchannels []*rss.Channel) {
 func processImage(ch *rss.Channel, folder string) {
 	logger.Debug.Println("Download image : " + ch.Image.Url)
 	if len(ch.Image.Url) > 0 {
-		imagepath, err := downloadFromUrl(ch.Image.Url, folder)
+		imagepath, err := downloadFromUrl(ch.Image.Url, folder, maxRetryDownload)
 		if err == nil {
 			convertImage(imagepath, filepath.Join(folder, "folder.jpg"))
 		} else {
@@ -152,7 +153,7 @@ func processImage(ch *rss.Channel, folder string) {
 }
 
 func process(selectedEnclosure *rss.Enclosure, folder string, item *rss.Item, channel *rss.Channel) {
-	file, err := downloadFromUrl(selectedEnclosure.Url, folder)
+	file, err := downloadFromUrl(selectedEnclosure.Url, folder, maxRetryDownload)
 	if err != nil {
 		logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
 	} else {
@@ -213,6 +214,7 @@ func readConfig() {
 	viper.SetDefault("maxFeedRunner", 5)
 	viper.SetDefault("maxImageRunner", 2)
 	viper.SetDefault("maxEpisodeRunner", 5)
+	viper.SetDefault("maxRetryDownload", 3)
 
 	err := viper.ReadInConfig()
 	if err != nil {
@@ -228,6 +230,7 @@ func readConfig() {
 	maxEpisodeRunner = viper.GetInt("maxEpisodeRunner")
 	maxFeedRunner = viper.GetInt("maxFeedRunner")
 	maxImageRunner = viper.GetInt("maxImageRunner")
+	maxRetryDownload = viper.GetInt("maxRetryDownload")
 
 }
 

@@ -5,12 +5,26 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/pivotal-golang/bytefmt"
 )
 
-func downloadFromUrl(url string, folder string) (path string, err error) {
+func downloadFromUrl(url string, folder string, maxretry int) (path string, err error) {
+
+	for i := 0; i < maxretry; i++ {
+		path, err = download(url, folder)
+		if err == nil {
+			break
+		} else {
+			logger.Warning.Println("Download failure at attempt "+strconv.Itoa(i)+" for url "+url, err)
+		}
+	}
+	return path, err
+}
+
+func download(url string, folder string) (path string, err error) {
 	tokens := strings.Split(url, "/")
 	fileName := tokens[len(tokens)-1]
 	fileName = filepath.Join(folder, fileName)
