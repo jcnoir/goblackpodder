@@ -13,7 +13,7 @@ import (
 
 func downloadFromUrl(url string, folder string, maxretry int) (path string, err error) {
 
-	for i := 0; i < maxretry; i++ {
+	for i := 1; i <= maxretry; i++ {
 		path, err = download(url, folder)
 		if err == nil {
 			break

@@ -194,6 +194,8 @@ func parseFeeds(filePath string) ([]string, error) {
 	content, err := ioutil.ReadFile(filePath)
 	if err == nil {
 		lines = strings.Split(string(content), "\n")
+		lines = lines[:len(lines)-1]
+		logger.Info.Println(strconv.Itoa(len(lines)) + " Podcasts found in the configuration")
 	}
 	return lines, err
 
@@ -213,7 +215,7 @@ func readConfig() {
 	viper.SetDefault("verbose", false)
 	viper.SetDefault("maxFeedRunner", 5)
 	viper.SetDefault("maxImageRunner", 2)
-	viper.SetDefault("maxEpisodeRunner", 5)
+	viper.SetDefault("maxEpisodeRunner", 10)
 	viper.SetDefault("maxRetryDownload", 3)
 
 	err := viper.ReadInConfig()
@@ -254,7 +256,7 @@ func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
 	}
 	if tag.Comment() == "" {
 		if len(episode.Description) > 500 {
-			episode.Description = episode.Description[0:500] + " ..."
+			episode.Description = episode.Description[:500] + " ..."
 		}
 		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing comment tag --> " + episode.Description)
 		tag.SetComment(episode.Description)
