@@ -240,7 +240,7 @@ func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
 	tag, err := taglib.Read(episodeFile)
 	modified := 0
 	if err != nil {
-		logger.Warning.Println("Cannot complete episode tags for " + podcast.Title + " - " + episode.Title)
+		logger.Warning.Println("Cannot complete episode tags for " + podcast.Title + " - " + episode.Title, err)
 		return
 	}
 
@@ -282,7 +282,7 @@ func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
 	}
 	if modified > 0 {
 		if err := tag.Save(); err != nil {
-			logger.Warning.Println(podcast.Title + " - " + episode.Title + " : Cannot save the modified tags")
+			logger.Warning.Println(podcast.Title + " - " + episode.Title + " : Cannot save the modified tags", err)
 		}
 		defer tag.Close()
 	}
