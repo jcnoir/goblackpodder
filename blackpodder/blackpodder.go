@@ -2,7 +2,6 @@
 package main
 
 import (
-	"black/go-taglib"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -10,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/wtolson/go-taglib"
 
 	rss "github.com/jteeuwen/go-pkg-rss"
 	viper "github.com/spf13/viper"
@@ -211,7 +212,7 @@ func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
 		}
 	}
 	if modified > 0 {
-		if !tag.Save() {
+		if err := tag.Save(); err != nil {
 			logger.Warning.Println(podcast.Title + " - " + episode.Title + " : Cannot save the modified tags")
 		}
 		defer tag.Close()

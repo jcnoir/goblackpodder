@@ -33,7 +33,6 @@ func downloadFromUrl(url string, folder string) (path string, err error) {
 			return fileName, err
 
 		}
-		req.Header.Add("Accept-Encoding", "identity")
 		req.Close = true
 		response, err := client.Do(req)
 		if err != nil {
