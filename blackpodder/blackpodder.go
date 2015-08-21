@@ -17,13 +17,32 @@ import (
 )
 
 var (
-	logger       Logger
-	wg           sync.WaitGroup
-	targetFolder string
-	feedsPath    string
-	maxEpisodes  int
-	verbose      bool
+	logger           Logger
+	wg               sync.WaitGroup
+	feedWg           sync.WaitGroup
+	targetFolder     string
+	feedsPath        string
+	maxEpisodes      int
+	verbose          bool
+	maxFeedRunner    int
+	maxImageRunner   int
+	maxEpisodeRunner int
+	episodeTasks     chan episodeTask
+	imageTasks       chan imageTask
+	feedTasks        chan string
 )
+
+type episodeTask struct {
+	selectedEnclosure *rss.Enclosure
+	folder            string
+	item              *rss.Item
+	channel           *rss.Channel
+}
+
+type imageTask struct {
+	ch     *rss.Channel
+	folder string
+}
 
 func main() {
 	readConfig()
@@ -33,22 +52,60 @@ func main() {
 		logger.Error.Panic("Cannot create the target folder : "+targetFolder+" : ", err)
 	}
 	logger.Info.Println("Podcast Update ...")
+
+	episodeTasks = make(chan episodeTask)
+	imageTasks = make(chan imageTask)
+	feedTasks = make(chan string)
+
+	for i := 0; i < maxFeedRunner; i++ {
+		feedWg.Add(1)
+		go func() {
+			for f := range feedTasks {
+				downloadFeed(f)
+			}
+			feedWg.Done()
+		}()
+	}
+
+	for i := 0; i < maxImageRunner; i++ {
+		wg.Add(1)
+		go func() {
+			for imageTask := range imageTasks {
+				processImage(imageTask.ch, imageTask.folder)
+			}
+			wg.Done()
+		}()
+	}
+
+	// spawn four worker goroutines
+	for i := 0; i < maxEpisodeRunner; i++ {
+		wg.Add(1)
+		go func() {
+			for episodeTask := range episodeTasks {
+				process(episodeTask.selectedEnclosure, episodeTask.folder, episodeTask.item, episodeTask.channel)
+			}
+			wg.Done()
+		}()
+	}
+
 	feeds, err := parseFeeds(feedsPath)
 	if err == nil {
 		for _, feed := range feeds {
-			downloadFeed(feed)
+			feedTasks <- feed
 		}
 	} else {
 		logger.Error.Println("Cannot parse feed file : ", err)
 	}
-
+	close(feedTasks)
+	feedWg.Wait()
+	close(imageTasks)
+	close(episodeTasks)
 	wg.Wait()
 	logger.Info.Println("Podcast Update Completed")
 }
 
 func downloadFeed(url string) {
-	wg.Add(1)
-	go PollFeed(url, 5, charsetReader, &wg)
+	PollFeed(url, 5, charsetReader)
 }
 
 func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
@@ -58,9 +115,9 @@ func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 	podcastFolder := filepath.Join(targetFolder, ch.Title)
 	os.MkdirAll(podcastFolder, 0777)
 
-	wg.Add(1)
-	go processImage(ch, podcastFolder)
+	imageTasks <- imageTask{ch, podcastFolder}
 
+	// generate some tasks
 	episodeCounter := 0
 
 	for _, item := range newitems {
@@ -68,8 +125,7 @@ func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 		if selectedEnclosure != nil {
 			if len(item.Enclosures) > 0 {
 				episodeCounter += 1
-				wg.Add(1)
-				go process(selectedEnclosure, podcastFolder, item, ch)
+				episodeTasks <- episodeTask{selectedEnclosure, podcastFolder, item, ch}
 				if episodeCounter >= maxEpisodes {
 					break
 				}
@@ -84,7 +140,6 @@ func chanHandler(feed *rss.Feed, newchannels []*rss.Channel) {
 }
 
 func processImage(ch *rss.Channel, folder string) {
-	defer wg.Done()
 	logger.Debug.Println("Download image : " + ch.Image.Url)
 	if len(ch.Image.Url) > 0 {
 		imagepath, err := downloadFromUrl(ch.Image.Url, folder)
@@ -97,7 +152,6 @@ func processImage(ch *rss.Channel, folder string) {
 }
 
 func process(selectedEnclosure *rss.Enclosure, folder string, item *rss.Item, channel *rss.Channel) {
-	defer wg.Done()
 	file, err := downloadFromUrl(selectedEnclosure.Url, folder)
 	if err != nil {
 		logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
@@ -155,7 +209,10 @@ func readConfig() {
 	viper.SetDefault("feeds", filepath.Join(configFolder, "feeds.dev"))
 	viper.SetDefault("directory", "/tmp/test-podcasts")
 	viper.SetDefault("episodes", 1)
-	viper.SetDefault("verbose", false)
+	viper.SetDefault("verbose", true)
+	viper.SetDefault("maxFeedRunner", 5)
+	viper.SetDefault("maxImageRunner", 2)
+	viper.SetDefault("maxEpisodeRunner", 5)
 
 	err := viper.ReadInConfig()
 	if err != nil {
@@ -168,6 +225,10 @@ func readConfig() {
 	feedsPath = viper.GetString("feeds")
 	maxEpisodes = viper.GetInt("episodes")
 	verbose = viper.GetBool("verbose")
+	maxEpisodeRunner = viper.GetInt("maxEpisodeRunner")
+	maxFeedRunner = viper.GetInt("maxFeedRunner")
+	maxImageRunner = viper.GetInt("maxImageRunner")
+
 }
 
 func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {

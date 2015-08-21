@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	rss "github.com/jteeuwen/go-pkg-rss"
@@ -14,8 +13,7 @@ import (
 	xmlx "github.com/jteeuwen/go-pkg-xmlx"
 )
 
-func PollFeed(uri string, timeout int, cr xmlx.CharsetFunc, wg *sync.WaitGroup) {
-	defer wg.Done()
+func PollFeed(uri string, timeout int, cr xmlx.CharsetFunc) {
 	feed := rss.New(timeout, true, chanHandler, itemHandler)
 	if err := feed.Fetch(uri, cr); err != nil {
 		logger.Info.Println(os.Stderr, "[e] %s: %s", uri, err)
