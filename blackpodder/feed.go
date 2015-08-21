@@ -4,7 +4,6 @@ package main
 import (
 	"errors"
 	"io"
-	"os"
 	"strings"
 	"time"
 
@@ -16,7 +15,7 @@ import (
 func PollFeed(uri string, timeout int, cr xmlx.CharsetFunc) {
 	feed := rss.New(timeout, true, chanHandler, itemHandler)
 	if err := feed.Fetch(uri, cr); err != nil {
-		logger.Info.Println(os.Stderr, "[e] %s: %s", uri, err)
+		logger.Warning.Println("Feed parsing failure with " +uri , err)
 		return
 	}
 	//<-time.After(time.Duration(feed.SecondsTillUpdate() * 1e9))

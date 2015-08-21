@@ -210,7 +210,7 @@ func readConfig() {
 	viper.SetDefault("feeds", filepath.Join(configFolder, "feeds.dev"))
 	viper.SetDefault("directory", "/tmp/test-podcasts")
 	viper.SetDefault("episodes", 1)
-	viper.SetDefault("verbose", true)
+	viper.SetDefault("verbose", false)
 	viper.SetDefault("maxFeedRunner", 5)
 	viper.SetDefault("maxImageRunner", 2)
 	viper.SetDefault("maxEpisodeRunner", 5)
@@ -253,6 +253,9 @@ func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
 		modified += 1
 	}
 	if tag.Comment() == "" {
+		if len(episode.Description) > 500 {
+			episode.Description = episode.Description[0:500] + " ..."
+		}
 		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing comment tag --> " + episode.Description)
 		tag.SetComment(episode.Description)
 		modified += 1
