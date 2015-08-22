@@ -2,6 +2,7 @@
 package main
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -32,6 +33,7 @@ var (
 	episodeTasks     chan episodeTask
 	imageTasks       chan imageTask
 	feedTasks        chan string
+	newEpisodes      chan string
 	rootCmd          *cobra.Command
 )
 
@@ -74,6 +76,7 @@ func fetchPodcasts() {
 	episodeTasks = make(chan episodeTask)
 	imageTasks = make(chan imageTask)
 	feedTasks = make(chan string)
+	newEpisodes = make(chan string, 1000)
 
 	for i := 0; i < maxFeedRunner; i++ {
 		feedWg.Add(1)
@@ -119,8 +122,31 @@ func fetchPodcasts() {
 	close(imageTasks)
 	close(episodeTasks)
 	wg.Wait()
+	close(newEpisodes)
+	processNewEpisodes()
 	logger.Info.Println("Podcast Update Completed")
 
+}
+
+func processNewEpisodes() {
+
+	if len(newEpisodes) > 0 {
+
+		filename := filepath.Join(targetFolder, "last-episodes.m3u")
+		file, err := os.Create(filename)
+		if err != nil {
+			logger.Error.Println("Cannot write the new episode file ", err)
+			return
+		}
+		defer file.Close()
+
+		logger.Debug.Println("Write the new episode file ", filename)
+
+		for newEpisode := range newEpisodes {
+			logger.Debug.Println("new episode added to playlist", newEpisode)
+			io.WriteString(file, newEpisode+"\n")
+		}
+	}
 }
 
 func main() {
@@ -134,8 +160,6 @@ func main() {
 		},
 	}
 	readConfig()
-
-	//rootCmd.SetArgs(os.Args)
 	rootCmd.Execute()
 
 }
@@ -179,7 +203,7 @@ func chanHandler(feed *rss.Feed, newchannels []*rss.Channel) {
 func processImage(ch *rss.Channel, folder string) {
 	logger.Debug.Println("Downloading image : " + ch.Image.Url)
 	if len(ch.Image.Url) > 0 {
-		imagepath, err := downloadFromUrl(ch.Image.Url, folder, maxRetryDownload)
+		imagepath, err, _ := downloadFromUrl(ch.Image.Url, folder, maxRetryDownload)
 		if err == nil {
 			convertImage(imagepath, filepath.Join(folder, "folder.jpg"))
 		} else {
@@ -190,10 +214,13 @@ func processImage(ch *rss.Channel, folder string) {
 
 func process(selectedEnclosure *rss.Enclosure, folder string, item *rss.Item, channel *rss.Channel) {
 	logger.Debug.Println("Downloading episode ", selectedEnclosure.Url)
-	file, err := downloadFromUrl(selectedEnclosure.Url, folder, maxRetryDownload)
+	file, err, newEpisode := downloadFromUrl(selectedEnclosure.Url, folder, maxRetryDownload)
 	if err != nil {
 		logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
 	} else {
+		if newEpisode {
+			newEpisodes <- file
+		}
 		completeTags(file, item, channel)
 	}
 }
