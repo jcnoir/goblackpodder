@@ -13,6 +13,7 @@ import (
 	"github.com/wtolson/go-taglib"
 
 	rss "github.com/jteeuwen/go-pkg-rss"
+	cobra "github.com/spf13/cobra"
 	viper "github.com/spf13/viper"
 )
 
@@ -31,6 +32,7 @@ var (
 	episodeTasks     chan episodeTask
 	imageTasks       chan imageTask
 	feedTasks        chan string
+	rootCmd          *cobra.Command
 )
 
 type episodeTask struct {
@@ -45,14 +47,29 @@ type imageTask struct {
 	folder string
 }
 
-func main() {
-	readConfig()
+func fetchPodcasts() {
+
+	targetFolder = viper.GetString("directory")
+	feedsPath = viper.GetString("feeds")
+	maxEpisodes = viper.GetInt("episodes")
+	verbose = viper.GetBool("verbose")
+	maxEpisodeRunner = viper.GetInt("maxEpisodeRunner")
+	maxFeedRunner = viper.GetInt("maxFeedRunner")
+	maxImageRunner = viper.GetInt("maxImageRunner")
+	maxRetryDownload = viper.GetInt("maxRetryDownload")
+
 	logger = NewLogger(verbose)
+	logger.Info.Println("Podcast Update ...")
+
+	if verbose {
+		viper.Debug()
+		rootCmd.DebugFlags()
+	}
+
 	err := os.MkdirAll(targetFolder, 0777)
 	if err != nil {
 		logger.Error.Panic("Cannot create the target folder : "+targetFolder+" : ", err)
 	}
-	logger.Info.Println("Podcast Update ...")
 
 	episodeTasks = make(chan episodeTask)
 	imageTasks = make(chan imageTask)
@@ -103,9 +120,28 @@ func main() {
 	close(episodeTasks)
 	wg.Wait()
 	logger.Info.Println("Podcast Update Completed")
+
+}
+
+func main() {
+
+	rootCmd = &cobra.Command{
+		Use:   "blackpodder",
+		Short: "Blackpodder is a podcast fetcher",
+		Long:  `A KISS podcast fetcher written in GO`,
+		Run: func(cmd *cobra.Command, args []string) {
+			fetchPodcasts()
+		},
+	}
+	readConfig()
+
+	//rootCmd.SetArgs(os.Args)
+	rootCmd.Execute()
+
 }
 
 func downloadFeed(url string) {
+	logger.Debug.Println("Downloading feed ", url)
 	PollFeed(url, 5, charsetReader)
 }
 
@@ -141,7 +177,7 @@ func chanHandler(feed *rss.Feed, newchannels []*rss.Channel) {
 }
 
 func processImage(ch *rss.Channel, folder string) {
-	logger.Debug.Println("Download image : " + ch.Image.Url)
+	logger.Debug.Println("Downloading image : " + ch.Image.Url)
 	if len(ch.Image.Url) > 0 {
 		imagepath, err := downloadFromUrl(ch.Image.Url, folder, maxRetryDownload)
 		if err == nil {
@@ -153,6 +189,7 @@ func processImage(ch *rss.Channel, folder string) {
 }
 
 func process(selectedEnclosure *rss.Enclosure, folder string, item *rss.Item, channel *rss.Channel) {
+	logger.Debug.Println("Downloading episode ", selectedEnclosure.Url)
 	file, err := downloadFromUrl(selectedEnclosure.Url, folder, maxRetryDownload)
 	if err != nil {
 		logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
@@ -209,38 +246,44 @@ func readConfig() {
 	viper.SetConfigName("config")
 	viper.AddConfigPath(configFolder)
 
-	viper.SetDefault("feeds", filepath.Join(configFolder, "feeds.dev"))
-	viper.SetDefault("directory", "/tmp/test-podcasts")
-	viper.SetDefault("episodes", 1)
-	viper.SetDefault("verbose", false)
-	viper.SetDefault("maxFeedRunner", 5)
-	viper.SetDefault("maxImageRunner", 2)
-	viper.SetDefault("maxEpisodeRunner", 10)
-	viper.SetDefault("maxRetryDownload", 3)
+	addStringProperty("feeds", "f", filepath.Join(configFolder, "feeds.dev"), "Feed file path")
+	addStringProperty("directory", "d", "/tmp/test-podcasts", "Podcast folder path")
+	addIntProperty("episodes", "e", 3, "Max episodes to download")
+	addBoolProperty("verbose", "v", false, "Max episodes to download")
+	addIntProperty("maxFeedRunner", "g", 5, "Max runners to fetch feeds")
+	addIntProperty("maxImageRunner", "i", 3, "Max runners to fetch images")
+	addIntProperty("maxEpisodeRunner", "j", 5, "Max runners to fetch episodes")
+	addIntProperty("maxRetryDownload", "k", 3, "Max http retries")
 
 	err := viper.ReadInConfig()
 	if err != nil {
 		logger.Error.Println("Fatal error config file: %s \n", err)
 	}
-	if verbose {
-		viper.Debug()
-	}
-	targetFolder = viper.GetString("directory")
-	feedsPath = viper.GetString("feeds")
-	maxEpisodes = viper.GetInt("episodes")
-	verbose = viper.GetBool("verbose")
-	maxEpisodeRunner = viper.GetInt("maxEpisodeRunner")
-	maxFeedRunner = viper.GetInt("maxFeedRunner")
-	maxImageRunner = viper.GetInt("maxImageRunner")
-	maxRetryDownload = viper.GetInt("maxRetryDownload")
+}
 
+func addStringProperty(name string, short string, defaultValue string, description string) {
+	viper.SetDefault(name, defaultValue)
+	rootCmd.Flags().StringP(name, short, defaultValue, description)
+	viper.BindPFlag(name, rootCmd.Flags().Lookup(name))
+}
+
+func addIntProperty(name string, short string, defaultValue int, description string) {
+	viper.SetDefault(name, defaultValue)
+	rootCmd.Flags().IntP(name, short, defaultValue, description)
+	viper.BindPFlag(name, rootCmd.Flags().Lookup(name))
+}
+
+func addBoolProperty(name string, short string, defaultValue bool, description string) {
+	viper.SetDefault(name, defaultValue)
+	rootCmd.Flags().BoolP(name, short, defaultValue, description)
+	viper.BindPFlag(name, rootCmd.Flags().Lookup(name))
 }
 
 func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
 	tag, err := taglib.Read(episodeFile)
 	modified := 0
 	if err != nil {
-		logger.Warning.Println("Cannot complete episode tags for " + podcast.Title + " - " + episode.Title, err)
+		logger.Warning.Println("Cannot complete episode tags for "+podcast.Title+" - "+episode.Title, err)
 		return
 	}
 
@@ -282,7 +325,7 @@ func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
 	}
 	if modified > 0 {
 		if err := tag.Save(); err != nil {
-			logger.Warning.Println(podcast.Title + " - " + episode.Title + " : Cannot save the modified tags", err)
+			logger.Warning.Println(podcast.Title+" - "+episode.Title+" : Cannot save the modified tags", err)
 		}
 		defer tag.Close()
 	}
