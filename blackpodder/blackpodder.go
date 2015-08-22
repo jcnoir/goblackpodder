@@ -128,7 +128,7 @@ func main() {
 	rootCmd = &cobra.Command{
 		Use:   "blackpodder",
 		Short: "Blackpodder is a podcast fetcher",
-		Long:  `A KISS podcast fetcher written in GO`,
+		Long:  `Blackpodder is a podcast fetcher written in GO`,
 		Run: func(cmd *cobra.Command, args []string) {
 			fetchPodcasts()
 		},
@@ -249,7 +249,7 @@ func readConfig() {
 	addStringProperty("feeds", "f", filepath.Join(configFolder, "feeds.dev"), "Feed file path")
 	addStringProperty("directory", "d", "/tmp/test-podcasts", "Podcast folder path")
 	addIntProperty("episodes", "e", 3, "Max episodes to download")
-	addBoolProperty("verbose", "v", false, "Max episodes to download")
+	addBoolProperty("verbose", "v", false, "Enable verbose mode")
 	addIntProperty("maxFeedRunner", "g", 5, "Max runners to fetch feeds")
 	addIntProperty("maxImageRunner", "i", 3, "Max runners to fetch images")
 	addIntProperty("maxEpisodeRunner", "j", 5, "Max runners to fetch episodes")
