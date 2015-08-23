@@ -224,9 +224,9 @@ func process(selectedEnclosure *rss.Enclosure, folder string, item *rss.Item, ch
 		logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
 	} else {
 		if newEpisode {
+			completeTags(file, item, channel)
 			newEpisodes <- file
 		}
-		completeTags(file, item, channel)
 	}
 }
 
