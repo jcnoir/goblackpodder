@@ -2,6 +2,7 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"io"
 	"io/ioutil"
@@ -280,37 +281,35 @@ func readConfig() {
 	viper.SetConfigName("config")
 	viper.AddConfigPath(configFolder)
 
-	addStringProperty("feeds", "f", filepath.Join(configFolder, "feeds.dev"), "Feed file path")
-	addStringProperty("directory", "d", "/tmp/test-podcasts", "Podcast folder path")
-	addIntProperty("episodes", "e", 3, "Max episodes to download")
-	addBoolProperty("verbose", "v", false, "Enable verbose mode")
-	addIntProperty("maxFeedRunner", "g", 5, "Max runners to fetch feeds")
-	addIntProperty("maxImageRunner", "i", 3, "Max runners to fetch images")
-	addIntProperty("maxEpisodeRunner", "j", 5, "Max runners to fetch episodes")
-	addIntProperty("maxRetryDownload", "k", 3, "Max http retries")
+	addProperty("feeds", "f", filepath.Join(configFolder, "feeds.dev"), "Feed file path")
+	addProperty("directory", "d", "/tmp/test-podcasts", "Podcast folder path")
+	addProperty("episodes", "e", 3, "Max episodes to download")
+	addProperty("verbose", "v", false, "Enable verbose mode")
+	addProperty("maxFeedRunner", "g", 5, "Max runners to fetch feeds")
+	addProperty("maxImageRunner", "i", 3, "Max runners to fetch images")
+	addProperty("maxEpisodeRunner", "j", 5, "Max runners to fetch episodes")
+	addProperty("maxRetryDownload", "k", 3, "Max http retries")
 
 	err := viper.ReadInConfig()
 	if err != nil {
 		logger.Error.Println("Fatal error config file: %s \n", err)
 	}
 }
+func addProperty(name string, short string, defaultValue interface{}, description string) {
 
-func addStringProperty(name string, short string, defaultValue string, description string) {
+	if typeValue, ok := defaultValue.(int); ok {
+		rootCmd.Flags().IntP(name, short, typeValue, description)
+	} else if typeValue, ok := defaultValue.(string); ok {
+		rootCmd.Flags().StringP(name, short, typeValue, description)
+	} else if typeValue, ok := defaultValue.(bool); ok {
+		rootCmd.Flags().BoolP(name, short, typeValue, description)
+	} else {
+		fmt.Println("Unknwown Property type will be ignored ", name)
+		return
+	}
 	viper.SetDefault(name, defaultValue)
-	rootCmd.Flags().StringP(name, short, defaultValue, description)
 	viper.BindPFlag(name, rootCmd.Flags().Lookup(name))
-}
 
-func addIntProperty(name string, short string, defaultValue int, description string) {
-	viper.SetDefault(name, defaultValue)
-	rootCmd.Flags().IntP(name, short, defaultValue, description)
-	viper.BindPFlag(name, rootCmd.Flags().Lookup(name))
-}
-
-func addBoolProperty(name string, short string, defaultValue bool, description string) {
-	viper.SetDefault(name, defaultValue)
-	rootCmd.Flags().BoolP(name, short, defaultValue, description)
-	viper.BindPFlag(name, rootCmd.Flags().Lookup(name))
 }
 
 func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
