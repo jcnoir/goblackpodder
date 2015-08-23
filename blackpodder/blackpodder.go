@@ -2,8 +2,10 @@
 package main
 
 import (
+	"image"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -35,6 +37,7 @@ var (
 	feedTasks        chan string
 	newEpisodes      chan string
 	rootCmd          *cobra.Command
+	httpClient       *http.Client
 )
 
 type episodeTask struct {
@@ -77,6 +80,8 @@ func fetchPodcasts() {
 	imageTasks = make(chan imageTask)
 	feedTasks = make(chan string)
 	newEpisodes = make(chan string, 1000)
+
+	httpClient = &http.Client{}
 
 	for i := 0; i < maxFeedRunner; i++ {
 		feedWg.Add(1)
@@ -203,7 +208,7 @@ func chanHandler(feed *rss.Feed, newchannels []*rss.Channel) {
 func processImage(ch *rss.Channel, folder string) {
 	logger.Debug.Println("Downloading image : " + ch.Image.Url)
 	if len(ch.Image.Url) > 0 {
-		imagepath, err, _ := downloadFromUrl(ch.Image.Url, folder, maxRetryDownload)
+		imagepath, err, _ := downloadFromUrl(ch.Image.Url, folder, maxRetryDownload, httpClient)
 		if err == nil {
 			convertImage(imagepath, filepath.Join(folder, "folder.jpg"))
 		} else {
@@ -214,7 +219,7 @@ func processImage(ch *rss.Channel, folder string) {
 
 func process(selectedEnclosure *rss.Enclosure, folder string, item *rss.Item, channel *rss.Channel) {
 	logger.Debug.Println("Downloading episode ", selectedEnclosure.Url)
-	file, err, newEpisode := downloadFromUrl(selectedEnclosure.Url, folder, maxRetryDownload)
+	file, err, newEpisode := downloadFromUrl(selectedEnclosure.Url, folder, maxRetryDownload, httpClient)
 	if err != nil {
 		logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
 	} else {
@@ -239,16 +244,18 @@ func selectEnclosure(item *rss.Item) *rss.Enclosure {
 }
 
 func convertImage(inputFile string, outputFile string) error {
-	inputImage, err := ImageRead(inputFile)
-	if err == nil {
-		if !pathExists(outputFile) {
+	var err error
+	var inputImage image.Image
+
+	if !pathExists(outputFile) {
+		inputImage, err = ImageRead(inputFile)
+		if err == nil {
 			err = Formatjpg(inputImage, outputFile)
-		} else {
-			logger.Debug.Println("Skipping the image conversion since it already exists", outputFile)
 		}
 	} else {
-		logger.Error.Println("Cannot convert podcast image : "+inputFile, err)
+		logger.Debug.Println("Skipping the image conversion since it already exists", outputFile)
 	}
+
 	return err
 
 }

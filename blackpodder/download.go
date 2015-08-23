@@ -11,10 +11,10 @@ import (
 	"github.com/pivotal-golang/bytefmt"
 )
 
-func downloadFromUrl(url string, folder string, maxretry int) (path string, err error, newEpisode bool) {
+func downloadFromUrl(url string, folder string, maxretry int, httpClient *http.Client) (path string, err error, newEpisode bool) {
 
 	for i := 1; i <= maxretry; i++ {
-		path, err, newEpisode = download(url, folder)
+		path, err, newEpisode = download(url, folder, httpClient)
 		if err == nil {
 			break
 		} else {
@@ -24,7 +24,7 @@ func downloadFromUrl(url string, folder string, maxretry int) (path string, err 
 	return path, err, newEpisode
 }
 
-func download(url string, folder string) (path string, err error, newEpisode bool) {
+func download(url string, folder string, httpClient *http.Client) (path string, err error, newEpisode bool) {
 	tokens := strings.Split(url, "/")
 	fileName := tokens[len(tokens)-1]
 	fileName = filepath.Join(folder, fileName)
@@ -41,14 +41,13 @@ func download(url string, folder string) (path string, err error, newEpisode boo
 
 		}
 		defer output.Close()
-		client := &http.Client{}
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			return fileName, err, newEpisode
 
 		}
 		req.Close = true
-		response, err := client.Do(req)
+		response, err := httpClient.Do(req)
 		if err != nil {
 			return fileName, err, newEpisode
 
