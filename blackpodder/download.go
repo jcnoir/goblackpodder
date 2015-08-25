@@ -3,11 +3,13 @@ package main
 import (
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/kennygrant/sanitize"
 	"github.com/pivotal-golang/bytefmt"
 )
 
@@ -24,10 +26,20 @@ func downloadFromUrl(url string, folder string, maxretry int, httpClient *http.C
 	return path, err, newEpisode
 }
 
-func download(url string, folder string, httpClient *http.Client) (path string, err error, newEpisode bool) {
-	tokens := strings.Split(url, "/")
+func download(uri string, folder string, httpClient *http.Client) (path string, err error, newEpisode bool) {
+	var urlPath string
+	parsedUrl, err := url.Parse(uri)
+	if err != nil {
+		logger.Warning.Println("Cannot extract path from url : "+uri+" : ", err)
+		urlPath = uri
+	} else {
+		urlPath = parsedUrl.Path
+	}
+	tokens := strings.Split(urlPath, "/")
 	fileName := tokens[len(tokens)-1]
 	fileName = filepath.Join(folder, fileName)
+	fileName = sanitize.Path(fileName)
+
 	tmpFilename := fileName + ".part"
 	resourceName := filepath.Base(folder) + " - " + filepath.Base(fileName)
 	defer removeTempFile(tmpFilename)
@@ -41,7 +53,7 @@ func download(url string, folder string, httpClient *http.Client) (path string, 
 
 		}
 		defer output.Close()
-		req, err := http.NewRequest("GET", url, nil)
+		req, err := http.NewRequest("GET", uri, nil)
 		if err != nil {
 			return fileName, err, newEpisode
 

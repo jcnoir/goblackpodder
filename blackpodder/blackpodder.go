@@ -14,11 +14,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/wtolson/go-taglib"
-
 	rss "github.com/jteeuwen/go-pkg-rss"
+	"github.com/kennygrant/sanitize"
 	cobra "github.com/spf13/cobra"
 	viper "github.com/spf13/viper"
+	"github.com/wtolson/go-taglib"
 )
 
 var (
@@ -180,6 +180,7 @@ func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 	logger.Debug.Println(strconv.Itoa(len(newitems)) + " available episodes for " + ch.Title)
 
 	podcastFolder := filepath.Join(targetFolder, ch.Title)
+	podcastFolder = sanitize.Path(podcastFolder)
 	os.MkdirAll(podcastFolder, 0777)
 
 	imageTasks <- imageTask{ch, podcastFolder}
@@ -287,7 +288,7 @@ func readConfig() {
 	addProperty("verbose", "v", false, "Enable verbose mode")
 	addProperty("maxFeedRunner", "g", 5, "Max runners to fetch feeds")
 	addProperty("maxImageRunner", "i", 3, "Max runners to fetch images")
-	addProperty("maxEpisodeRunner", "j", 5, "Max runners to fetch episodes")
+	addProperty("maxEpisodeRunner", "j", 10, "Max runners to fetch episodes")
 	addProperty("maxRetryDownload", "k", 3, "Max http retries")
 
 	err := viper.ReadInConfig()
