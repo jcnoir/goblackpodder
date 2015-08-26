@@ -39,6 +39,8 @@ var (
 	newEpisodes      chan string
 	rootCmd          *cobra.Command
 	httpClient       *http.Client
+	maxCommentSize   int
+	retagExisting    bool
 )
 
 type episodeTask struct {
@@ -63,6 +65,8 @@ func fetchPodcasts() {
 	maxFeedRunner = viper.GetInt("maxFeedRunner")
 	maxImageRunner = viper.GetInt("maxImageRunner")
 	maxRetryDownload = viper.GetInt("maxRetryDownload")
+	maxCommentSize = viper.GetInt("maxCommentSize")
+	retagExisting = viper.GetBool("retagExisting")
 
 	logger = NewLogger(verbose)
 	logger.Info.Println("Podcast Update ...")
@@ -225,8 +229,11 @@ func process(selectedEnclosure *rss.Enclosure, folder string, item *rss.Item, ch
 	if err != nil {
 		logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
 	} else {
-		if newEpisode {
+
+		if newEpisode || retagExisting {
 			completeTags(file, item, channel)
+		}
+		if newEpisode {
 			newEpisodes <- file
 		}
 	}
@@ -290,6 +297,8 @@ func readConfig() {
 	addProperty("maxImageRunner", "i", 3, "Max runners to fetch images")
 	addProperty("maxEpisodeRunner", "j", 10, "Max runners to fetch episodes")
 	addProperty("maxRetryDownload", "k", 3, "Max http retries")
+	addProperty("maxCommentSize", "l", 500, "Max comment length")
+	addProperty("retagExisting", "r", false, "Retag existing episodes")
 
 	err := viper.ReadInConfig()
 	if err != nil {
@@ -332,13 +341,18 @@ func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
 		modified += 1
 	}
 	if tag.Comment() == "" {
-		if len(episode.Description) > 500 {
-			episode.Description = episode.Description[:500] + " ..."
+		if len(episode.Description) > maxCommentSize {
+			episode.Description = episode.Description[:maxCommentSize] + " ..."
 		}
 		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing comment tag --> " + episode.Description)
 		tag.SetComment(episode.Description)
 		modified += 1
+	} else if len(tag.Comment()) > maxCommentSize {
+		tag.SetComment(tag.Comment()[:maxCommentSize] + "...")
+		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Limiting comment tag --> " + tag.Comment())
+		modified += 1
 	}
+
 	if tag.Title() == "" {
 		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing title tag --> " + episode.Title)
 		tag.SetTitle(episode.Title)
