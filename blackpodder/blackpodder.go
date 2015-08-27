@@ -125,6 +125,7 @@ func fetchPodcasts() {
 			feedTasks <- feed
 		}
 	} else {
+
 		logger.Error.Println("Cannot parse feed file : ", err)
 	}
 	close(feedTasks)
@@ -304,6 +305,7 @@ func readConfig() {
 	if err != nil {
 		logger.Error.Println("Fatal error config file: %s \n", err)
 	}
+
 }
 func addProperty(name string, short string, defaultValue interface{}, description string) {
 
@@ -323,12 +325,13 @@ func addProperty(name string, short string, defaultValue interface{}, descriptio
 }
 
 func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
-	tag, err := taglib.Read(episodeFile)
 	modified := 0
+	tag, err := taglib.Read(episodeFile)
 	if err != nil {
 		logger.Warning.Println("Cannot complete episode tags for "+podcast.Title+" - "+episode.Title, err)
 		return
 	}
+	defer tag.Close()
 
 	if tag.Artist() == "" {
 		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing artist tag --> " + podcast.Title)
@@ -375,7 +378,6 @@ func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
 		if err := tag.Save(); err != nil {
 			logger.Warning.Println(podcast.Title+" - "+episode.Title+" : Cannot save the modified tags", err)
 		}
-		defer tag.Close()
 	}
 
 }
