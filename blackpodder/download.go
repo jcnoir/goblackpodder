@@ -13,20 +13,24 @@ import (
 	"github.com/pivotal-golang/bytefmt"
 )
 
-func downloadFromUrl(url string, folder string, maxretry int, httpClient *http.Client) (path string, err error, newEpisode bool) {
+func downloadFromUrl(url string, folder string, maxretry int, httpClient *http.Client, fileName string) (path string, err error, newEpisode bool) {
 
 	for i := 1; i <= maxretry; i++ {
-		path, err, newEpisode = download(url, folder, httpClient)
+		path, err, newEpisode = download(url, folder, httpClient, fileName)
 		if err == nil {
 			break
 		} else {
-			logger.Warning.Println("Download failure at attempt "+strconv.Itoa(i)+" for url "+url, err)
+			logger.Warning.Println("Download failure at attempt "+strconv.Itoa(i)+"/"+strconv.Itoa(maxretry)+" for url "+url, err)
 		}
 	}
 	return path, err, newEpisode
 }
 
-func download(uri string, folder string, httpClient *http.Client) (path string, err error, newEpisode bool) {
+func downloadFromUrlWithoutName(url string, folder string, maxretry int, httpClient *http.Client) (path string, err error, newEpisode bool) {
+	return downloadFromUrl(url, folder, maxretry, httpClient, "")
+}
+
+func download(uri string, folder string, httpClient *http.Client, fileName string) (path string, err error, newEpisode bool) {
 	var urlPath string
 	parsedUrl, err := url.Parse(uri)
 	if err != nil {
@@ -36,9 +40,11 @@ func download(uri string, folder string, httpClient *http.Client) (path string, 
 		urlPath = parsedUrl.Path
 	}
 	tokens := strings.Split(urlPath, "/")
-	fileName := tokens[len(tokens)-1]
-	fileName = filepath.Join(folder, fileName)
+	fileName = fileName + tokens[len(tokens)-1]
 	fileName = sanitize.Path(fileName)
+	fileName = filepath.Join(folder, fileName)
+
+	logger.Debug.Println("Local resource path : " + fileName)
 
 	tmpFilename := fileName + ".part"
 	resourceName := filepath.Base(folder) + " - " + filepath.Base(fileName)

@@ -14,12 +14,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jaytaylor/html2text"
 	rss "github.com/jteeuwen/go-pkg-rss"
 	"github.com/kennygrant/sanitize"
 	cobra "github.com/spf13/cobra"
 	viper "github.com/spf13/viper"
-	"github.com/wtolson/go-taglib"
 )
 
 var (
@@ -205,7 +203,7 @@ func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 				}
 			}
 		} else {
-			logger.Warning.Println("No audio found for episode " + ch.Title + " - " + item.Title)
+			logger.Debug.Println("No audio found for episode " + ch.Title + " - " + item.Title)
 		}
 	}
 }
@@ -216,7 +214,7 @@ func chanHandler(feed *rss.Feed, newchannels []*rss.Channel) {
 func processImage(ch *rss.Channel, folder string) {
 	logger.Debug.Println("Downloading image : " + ch.Image.Url)
 	if len(ch.Image.Url) > 0 {
-		imagepath, err, _ := downloadFromUrl(ch.Image.Url, folder, maxRetryDownload, httpClient)
+		imagepath, err, _ := downloadFromUrlWithoutName(ch.Image.Url, folder, maxRetryDownload, httpClient)
 		if err == nil {
 			convertImage(imagepath, filepath.Join(folder, "folder.jpg"))
 		} else {
@@ -227,7 +225,18 @@ func processImage(ch *rss.Channel, folder string) {
 
 func process(selectedEnclosure *rss.Enclosure, folder string, item *rss.Item, channel *rss.Channel) {
 	logger.Debug.Println("Downloading episode ", selectedEnclosure.Url)
-	file, err, newEpisode := downloadFromUrl(selectedEnclosure.Url, folder, maxRetryDownload, httpClient)
+
+	episodeTime, converr := item.ParsedPubDate()
+	var episodeTimeStr string
+	if converr != nil {
+		episodeTimeStr = item.PubDate
+	} else {
+		episodeTimeStr = episodeTime.Format("060102")
+	}
+	fileName := "BLP_" + episodeTimeStr + "_"
+
+	file, err, newEpisode := downloadFromUrl(selectedEnclosure.Url, folder, maxRetryDownload, httpClient, fileName)
+
 	if err != nil {
 		logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
 	} else {
@@ -322,56 +331,5 @@ func addProperty(name string, short string, defaultValue interface{}, descriptio
 	}
 	viper.SetDefault(name, defaultValue)
 	viper.BindPFlag(name, rootCmd.Flags().Lookup(name))
-
-}
-
-func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
-	modified := 0
-	tag, err := taglib.Read(episodeFile)
-	if err != nil {
-		logger.Warning.Println("Cannot complete episode tags for "+podcast.Title+" - "+episode.Title, err)
-		return
-	}
-	defer tag.Close()
-
-	logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing artist tag --> " + podcast.Title)
-	tag.SetArtist(podcast.Title)
-	modified += 1
-
-	logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing album tag --> " + podcast.Title)
-	tag.SetAlbum(podcast.Title)
-	modified += 1
-
-	plaintextDescription, err := html2text.FromString(episode.Description)
-	if err == nil {
-		episode.Description = plaintextDescription
-	}
-
-	if len(episode.Description) > maxCommentSize+5 {
-		episode.Description = episode.Description[:maxCommentSize] + " ..."
-	}
-	logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing comment tag --> " + episode.Description)
-	tag.SetComment(episode.Description)
-	modified += 1
-
-	logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing title tag --> " + episode.Title)
-	tag.SetTitle(episode.Title)
-	modified += 1
-
-	logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing genre tag --> " + "Podcast")
-	tag.SetGenre("Podcast")
-	modified += 1
-
-	pubdate, err := episode.ParsedPubDate()
-	if err == nil {
-		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing year tag --> " + strconv.Itoa(pubdate.Year()))
-		tag.SetYear(pubdate.Year())
-		modified += 1
-	}
-	if modified > 0 {
-		if err := tag.Save(); err != nil {
-			logger.Warning.Println(podcast.Title+" - "+episode.Title+" : Cannot save the modified tags", err)
-		}
-	}
 
 }
