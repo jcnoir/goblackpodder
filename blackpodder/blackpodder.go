@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/jaytaylor/html2text"
 	rss "github.com/jteeuwen/go-pkg-rss"
 	"github.com/kennygrant/sanitize"
 	cobra "github.com/spf13/cobra"
@@ -333,46 +334,39 @@ func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
 	}
 	defer tag.Close()
 
-	if tag.Artist() == "" {
-		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing artist tag --> " + podcast.Title)
-		tag.SetArtist(podcast.Title)
-		modified += 1
-	}
-	if tag.Album() == "" {
-		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing album tag --> " + podcast.Title)
-		tag.SetAlbum(podcast.Title)
-		modified += 1
-	}
-	if tag.Comment() == "" {
-		if len(episode.Description) > maxCommentSize+5 {
-			episode.Description = episode.Description[:maxCommentSize] + " ..."
-		}
-		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing comment tag --> " + episode.Description)
-		tag.SetComment(episode.Description)
-		modified += 1
-	} else if len(tag.Comment()) > maxCommentSize+5 {
-		tag.SetComment(tag.Comment()[:maxCommentSize] + "...")
-		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Limiting comment tag --> " + tag.Comment())
-		modified += 1
+	logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing artist tag --> " + podcast.Title)
+	tag.SetArtist(podcast.Title)
+	modified += 1
+
+	logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing album tag --> " + podcast.Title)
+	tag.SetAlbum(podcast.Title)
+	modified += 1
+
+	plaintextDescription, err := html2text.FromString(episode.Description)
+	if err == nil {
+		episode.Description = plaintextDescription
 	}
 
-	if tag.Title() == "" {
-		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing title tag --> " + episode.Title)
-		tag.SetTitle(episode.Title)
-		modified += 1
+	if len(episode.Description) > maxCommentSize+5 {
+		episode.Description = episode.Description[:maxCommentSize] + " ..."
 	}
-	if tag.Genre() == "" {
-		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing genre tag --> " + "Podcast")
-		tag.SetGenre("Podcast")
+	logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing comment tag --> " + episode.Description)
+	tag.SetComment(episode.Description)
+	modified += 1
+
+	logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing title tag --> " + episode.Title)
+	tag.SetTitle(episode.Title)
+	modified += 1
+
+	logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing genre tag --> " + "Podcast")
+	tag.SetGenre("Podcast")
+	modified += 1
+
+	pubdate, err := episode.ParsedPubDate()
+	if err == nil {
+		logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing year tag --> " + strconv.Itoa(pubdate.Year()))
+		tag.SetYear(pubdate.Year())
 		modified += 1
-	}
-	if tag.Year() == 0 {
-		pubdate, err := episode.ParsedPubDate()
-		if err == nil {
-			logger.Info.Println(podcast.Title + " - " + episode.Title + " : Add missing year tag --> " + strconv.Itoa(pubdate.Year()))
-			tag.SetYear(pubdate.Year())
-			modified += 1
-		}
 	}
 	if modified > 0 {
 		if err := tag.Save(); err != nil {
