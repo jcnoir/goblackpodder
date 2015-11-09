@@ -19,7 +19,13 @@ func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
 	}
 	defer tag.Close()
 
-	completeTag(taglib.Artist, podcast.Title, tag)
+	var replaceArtist string
+	if podcast.Author.Name != "" {
+		replaceArtist = podcast.Author.Name
+	} else {
+		replaceArtist = podcast.Title
+	}
+	completeTag(taglib.Artist, replaceArtist, tag)
 	completeTag(taglib.Album, podcast.Title, tag)
 
 	plaintextDescription, err := html2text.FromString(episode.Description)
