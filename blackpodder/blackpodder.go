@@ -156,6 +156,7 @@ func processNewEpisodes() {
 			logger.Debug.Println("new episode added to playlist", newEpisode)
 			io.WriteString(file, newEpisode+"\n")
 		}
+		logger.Debug.Println("Last episode playlist written")
 	}
 }
 

@@ -38,10 +38,14 @@ func completeTags(episodeFile string, episode *rss.Item, podcast *rss.Channel) {
 	if err == nil {
 		completeTag(taglib.Year, strconv.Itoa(pubdate.Year()), tag)
 	}
-
-	if err := tag.Save(); err != nil {
+	logger.Debug.Println("Tag Write Start for : " + episodeFile)
+	err = tag.Save()
+	logger.Debug.Println("Tag Write End for : " + episodeFile)
+	if err != nil {
 		logger.Warning.Println(podcast.Title+" - "+episode.Title+" : Cannot save the modified tags", err)
 	}
+	logger.Info.Println("Tag update END : " + podcast.Title + " - " + episode.Title)
+
 }
 func completeTag(tagname taglib.TagName, tagvalue string, tag *taglib.File) {
 	logger.Info.Println(tagname.String() + " --> " + tagvalue)
