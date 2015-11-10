@@ -3,7 +3,6 @@ package main
 
 import (
 	"fmt"
-	"image"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -15,7 +14,6 @@ import (
 	"sync"
 
 	rss "github.com/jteeuwen/go-pkg-rss"
-	"github.com/kennygrant/sanitize"
 	cobra "github.com/spf13/cobra"
 	viper "github.com/spf13/viper"
 )
@@ -33,7 +31,6 @@ var (
 	maxEpisodeRunner int
 	maxRetryDownload int
 	episodeTasks     chan episodeTask
-	imageTasks       chan imageTask
 	feedTasks        chan string
 	newEpisodes      chan string
 	rootCmd          *cobra.Command
@@ -49,9 +46,9 @@ type episodeTask struct {
 	channel           *rss.Channel
 }
 
-type imageTask struct {
-	ch     *rss.Channel
-	folder string
+type Episode struct {
+	feedEpisode *rss.Item
+	Podcast     Podcast
 }
 
 func fetchPodcasts() {
@@ -81,7 +78,6 @@ func fetchPodcasts() {
 	}
 
 	episodeTasks = make(chan episodeTask)
-	imageTasks = make(chan imageTask)
 	feedTasks = make(chan string)
 	newEpisodes = make(chan string, 1000)
 
@@ -94,16 +90,6 @@ func fetchPodcasts() {
 				downloadFeed(f)
 			}
 			feedWg.Done()
-		}()
-	}
-
-	for i := 0; i < maxImageRunner; i++ {
-		wg.Add(1)
-		go func() {
-			for imageTask := range imageTasks {
-				processImage(imageTask.ch, imageTask.folder)
-			}
-			wg.Done()
 		}()
 	}
 
@@ -129,7 +115,6 @@ func fetchPodcasts() {
 	}
 	close(feedTasks)
 	feedWg.Wait()
-	close(imageTasks)
 	close(episodeTasks)
 	wg.Wait()
 	close(newEpisodes)
@@ -184,13 +169,10 @@ func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 
 	logger.Debug.Println(strconv.Itoa(len(newitems)) + " available episodes for " + ch.Title)
 
-	podcastFolder := filepath.Join(targetFolder, ch.Title)
-	podcastFolder = sanitize.Path(podcastFolder)
-	os.MkdirAll(podcastFolder, 0777)
+	podcast := Podcast{targetFolder, ch}
+	podcast.mkdir()
+	podcast.downloadImage()
 
-	imageTasks <- imageTask{ch, podcastFolder}
-
-	// generate some tasks
 	episodeCounter := 0
 
 	for _, item := range newitems {
@@ -198,7 +180,7 @@ func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 		if selectedEnclosure != nil {
 			if len(item.Enclosures) > 0 {
 				episodeCounter += 1
-				episodeTasks <- episodeTask{selectedEnclosure, podcastFolder, item, ch}
+				episodeTasks <- episodeTask{selectedEnclosure, podcast.dir(), item, ch}
 				if episodeCounter >= maxEpisodes {
 					break
 				}
@@ -210,18 +192,6 @@ func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 }
 
 func chanHandler(feed *rss.Feed, newchannels []*rss.Channel) {
-}
-
-func processImage(ch *rss.Channel, folder string) {
-	logger.Debug.Println("Downloading image : " + ch.Image.Url)
-	if len(ch.Image.Url) > 0 {
-		imagepath, err, _ := downloadFromUrlWithoutName(ch.Image.Url, folder, maxRetryDownload, httpClient)
-		if err == nil {
-			convertImage(imagepath, filepath.Join(folder, "folder.jpg"))
-		} else {
-			logger.Error.Println("Podcast image processing failure", err)
-		}
-	}
 }
 
 func process(selectedEnclosure *rss.Enclosure, folder string, item *rss.Item, channel *rss.Channel) {
@@ -262,23 +232,6 @@ func selectEnclosure(item *rss.Item) *rss.Enclosure {
 		}
 	}
 	return selectedEnclosure
-}
-
-func convertImage(inputFile string, outputFile string) error {
-	var err error
-	var inputImage image.Image
-
-	if !pathExists(outputFile) {
-		inputImage, err = ImageRead(inputFile)
-		if err == nil {
-			err = Formatjpg(inputImage, outputFile)
-		}
-	} else {
-		logger.Debug.Println("Skipping the image conversion since it already exists", outputFile)
-	}
-
-	return err
-
 }
 
 func parseFeeds(filePath string) ([]string, error) {

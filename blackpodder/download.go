@@ -30,7 +30,7 @@ func downloadFromUrlWithoutName(url string, folder string, maxretry int, httpCli
 	return downloadFromUrl(url, folder, maxretry, httpClient, "")
 }
 
-func download(uri string, folder string, httpClient *http.Client, fileName string) (path string, err error, newEpisode bool) {
+func extractResourceNameFromUrl(uri string) string {
 	var urlPath string
 	parsedUrl, err := url.Parse(uri)
 	if err != nil {
@@ -40,7 +40,12 @@ func download(uri string, folder string, httpClient *http.Client, fileName strin
 		urlPath = parsedUrl.Path
 	}
 	tokens := strings.Split(urlPath, "/")
-	fileName = fileName + tokens[len(tokens)-1]
+	resource := tokens[len(tokens)-1]
+	return resource
+}
+
+func download(uri string, folder string, httpClient *http.Client, fileName string) (path string, err error, newEpisode bool) {
+	fileName = fileName + extractResourceNameFromUrl(uri)
 	fileName = sanitize.Path(fileName)
 	fileName = filepath.Join(folder, fileName)
 
