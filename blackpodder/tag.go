@@ -36,7 +36,7 @@ func completeTags(episode *Episode) {
 	}
 
 	completeTag(taglib.Comments, episode.feedEpisode.Description, tag)
-	completeTag(taglib.Title, episode.feedEpisode.Title, tag)
+	completeTag(taglib.Title, episode.feedEpisode.Title +" " +episode.pubDate(), tag)
 	completeTag(taglib.Genre, "Podcast", tag)
 
 	pubdate, err := episode.feedEpisode.ParsedPubDate()

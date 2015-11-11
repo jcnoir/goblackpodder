@@ -27,15 +27,20 @@ func (e Episode) selectEnclosure() *rss.Enclosure {
 	return selectedEnclosure
 }
 
-func (e Episode) file() string {
-	episodeTime, converr := e.feedEpisode.ParsedPubDate()
+func (e Episode) pubDate() string {
 	var episodeTimeStr string
+	episodeTime, converr := e.feedEpisode.ParsedPubDate()
 	if converr != nil {
 		episodeTimeStr = e.feedEpisode.PubDate
 	} else {
 		episodeTimeStr = episodeTime.Format("060102")
 	}
-	fileNamePrefix := "BLP_" + episodeTimeStr + "_"
+	return episodeTimeStr
+}
+
+func (e Episode) file() string {
+
+	fileNamePrefix := "BLP_" + e.pubDate() + "_"
 	return filepath.Join(e.Podcast.dir(), sanitize.Path(fileNamePrefix+extractResourceNameFromUrl(e.enclosure.Url)))
 }
 

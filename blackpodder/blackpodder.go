@@ -81,31 +81,31 @@ func fetchPodcasts() {
 	for i := 0; i < maxFeedRunner; i++ {
 		feedWg.Add(1)
 		go func() {
+			defer feedWg.Done()
 			for f := range feedTasks {
 				downloadFeed(f)
 			}
-			feedWg.Done()
 		}()
 	}
 
-	// spawn four worker goroutines
 	for i := 0; i < maxEpisodeRunner; i++ {
 		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			for episodeTask := range episodeTasks {
 				process(episodeTask)
 			}
-			wg.Done()
 		}()
 	}
 
 	feeds, err := parseFeeds(feedsPath)
+	logger.Debug.Println("Feeds : ", feeds)
 	if err == nil {
 		for _, feed := range feeds {
+			logger.Debug.Println("Adding podcast url in the pipe : " + feed)
 			feedTasks <- feed
 		}
 	} else {
-
 		logger.Error.Println("Cannot parse feed file : ", err)
 	}
 	close(feedTasks)
@@ -115,7 +115,6 @@ func fetchPodcasts() {
 	close(newEpisodes)
 	processNewEpisodes()
 	logger.Info.Println("Podcast Update Completed")
-
 }
 
 func processNewEpisodes() {
@@ -215,13 +214,22 @@ func process(episode *Episode) {
 
 func parseFeeds(filePath string) ([]string, error) {
 	var lines []string
+	filteredLines := make([]string, 0)
+
 	content, err := ioutil.ReadFile(filePath)
 	if err == nil {
 		lines = strings.Split(string(content), "\n")
 		lines = lines[:len(lines)-1]
-		logger.Info.Println(strconv.Itoa(len(lines)) + " Podcasts found in the configuration")
+
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if !strings.HasPrefix(line, "#") {
+				filteredLines = append(filteredLines, line)
+			}
+		}
+		logger.Info.Println(strconv.Itoa(len(filteredLines)) + " Podcasts found in the configuration")
 	}
-	return lines, err
+	return filteredLines, err
 
 }
 
