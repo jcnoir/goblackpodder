@@ -26,6 +26,8 @@ func (podcast Podcast) mkdir() error {
 
 func (podcast Podcast) image() string {
 	imageName := extractResourceNameFromUrl(podcast.feedPodcast.Image.Url)
+	imageName = sanitize.Path(imageName)
+
 	return filepath.Join(podcast.dir(), imageName)
 }
 
@@ -34,11 +36,10 @@ func (podcast Podcast) convertedImage() string {
 }
 
 func (podcast Podcast) downloadImage() {
-	logger.Debug.Println("Downloading image : " + podcast.feedPodcast.Image.Url)
 	if len(podcast.feedPodcast.Image.Url) > 0 {
-		imageName := extractResourceNameFromUrl(podcast.feedPodcast.Image.Url)
-		if !pathExists(filepath.Join(podcast.dir(), imageName)) {
-			_, err, _ := downloadFromUrlWithoutName(podcast.feedPodcast.Image.Url, podcast.dir(), maxRetryDownload, httpClient)
+		if !pathExists(podcast.image()) {
+			logger.Debug.Println("Downloading image : " + podcast.feedPodcast.Image.Url)
+			_, err, _ := downloadFromUrl(podcast.feedPodcast.Image.Url, podcast.dir(), maxRetryDownload, httpClient, filepath.Base(podcast.image()))
 			if err == nil {
 				podcast.convertImage()
 			} else {
@@ -58,10 +59,7 @@ func (podcast Podcast) convertImage() error {
 		if err == nil {
 			err = Formatjpg(inputImage, podcast.convertedImage())
 		}
-	} else {
-		logger.Debug.Println("Skipping the image conversion since it already exists", podcast.convertedImage())
 	}
-
 	return err
 
 }

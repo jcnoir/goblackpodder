@@ -30,7 +30,7 @@ var (
 	maxImageRunner   int
 	maxEpisodeRunner int
 	maxRetryDownload int
-	episodeTasks     chan episodeTask
+	episodeTasks     chan *Episode
 	feedTasks        chan string
 	newEpisodes      chan string
 	rootCmd          *cobra.Command
@@ -44,11 +44,6 @@ type episodeTask struct {
 	folder            string
 	item              *rss.Item
 	channel           *rss.Channel
-}
-
-type Episode struct {
-	feedEpisode *rss.Item
-	Podcast     Podcast
 }
 
 func fetchPodcasts() {
@@ -77,7 +72,7 @@ func fetchPodcasts() {
 		logger.Error.Panic("Cannot create the target folder : "+targetFolder+" : ", err)
 	}
 
-	episodeTasks = make(chan episodeTask)
+	episodeTasks = make(chan *Episode)
 	feedTasks = make(chan string)
 	newEpisodes = make(chan string, 1000)
 
@@ -98,7 +93,7 @@ func fetchPodcasts() {
 		wg.Add(1)
 		go func() {
 			for episodeTask := range episodeTasks {
-				process(episodeTask.selectedEnclosure, episodeTask.folder, episodeTask.item, episodeTask.channel)
+				process(episodeTask)
 			}
 			wg.Done()
 		}()
@@ -138,8 +133,12 @@ func processNewEpisodes() {
 		logger.Debug.Println("Write the new episode file ", filename)
 
 		for newEpisode := range newEpisodes {
-			logger.Debug.Println("new episode added to playlist", newEpisode)
-			io.WriteString(file, newEpisode+"\n")
+			if pathExists(newEpisode) {
+				logger.Debug.Println("new episode added to playlist", newEpisode)
+				io.WriteString(file, newEpisode+"\n")
+			} else {
+				logger.Error.Println("Non existing new episode path : " + newEpisode)
+			}
 		}
 		logger.Debug.Println("Last episode playlist written")
 	}
@@ -176,11 +175,12 @@ func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 	episodeCounter := 0
 
 	for _, item := range newitems {
-		selectedEnclosure := selectEnclosure(item)
+		episode := NewEpisode(item, &podcast)
+		selectedEnclosure := episode.enclosure
 		if selectedEnclosure != nil {
-			if len(item.Enclosures) > 0 {
+			if len(episode.feedEpisode.Enclosures) > 0 {
 				episodeCounter += 1
-				episodeTasks <- episodeTask{selectedEnclosure, podcast.dir(), item, ch}
+				episodeTasks <- episode
 				if episodeCounter >= maxEpisodes {
 					break
 				}
@@ -194,44 +194,23 @@ func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 func chanHandler(feed *rss.Feed, newchannels []*rss.Channel) {
 }
 
-func process(selectedEnclosure *rss.Enclosure, folder string, item *rss.Item, channel *rss.Channel) {
-	logger.Debug.Println("Downloading episode ", selectedEnclosure.Url)
-
-	episodeTime, converr := item.ParsedPubDate()
-	var episodeTimeStr string
-	if converr != nil {
-		episodeTimeStr = item.PubDate
-	} else {
-		episodeTimeStr = episodeTime.Format("060102")
-	}
-	fileName := "BLP_" + episodeTimeStr + "_"
-
-	file, err, newEpisode := downloadFromUrl(selectedEnclosure.Url, folder, maxRetryDownload, httpClient, fileName)
-
-	if err != nil {
-		logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
-	} else {
-
-		if newEpisode || retagExisting {
-			completeTags(file, item, channel)
-		}
-		if newEpisode {
-			newEpisodes <- file
-		}
-	}
-}
-
-func selectEnclosure(item *rss.Item) *rss.Enclosure {
-	var selectedEnclosure *rss.Enclosure
-
-	if len(item.Enclosures) > 0 {
-		for _, enclosure := range item.Enclosures {
-			if strings.Contains(enclosure.Type, "audio") && (selectedEnclosure == nil || enclosure.Length > selectedEnclosure.Length) {
-				selectedEnclosure = enclosure
+func process(episode *Episode) {
+	selectedEnclosure := episode.enclosure
+	if !pathExists(episode.file()) {
+		logger.Debug.Println("Downloading episode ", episode.enclosure.Url)
+		file, err, newEpisode := downloadFromUrl(selectedEnclosure.Url, episode.Podcast.dir(), maxRetryDownload, httpClient, filepath.Base(episode.file()))
+		if err != nil {
+			logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
+		} else {
+			if newEpisode {
+				completeTags(episode)
+				newEpisodes <- file
 			}
 		}
 	}
-	return selectedEnclosure
+	if retagExisting {
+		completeTags(episode)
+	}
 }
 
 func parseFeeds(filePath string) ([]string, error) {

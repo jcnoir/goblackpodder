@@ -27,7 +27,8 @@ func downloadFromUrl(url string, folder string, maxretry int, httpClient *http.C
 }
 
 func downloadFromUrlWithoutName(url string, folder string, maxretry int, httpClient *http.Client) (path string, err error, newEpisode bool) {
-	return downloadFromUrl(url, folder, maxretry, httpClient, "")
+	fileName := extractResourceNameFromUrl(url)
+	return downloadFromUrl(url, folder, maxretry, httpClient, fileName)
 }
 
 func extractResourceNameFromUrl(uri string) string {
@@ -45,12 +46,9 @@ func extractResourceNameFromUrl(uri string) string {
 }
 
 func download(uri string, folder string, httpClient *http.Client, fileName string) (path string, err error, newEpisode bool) {
-	fileName = fileName + extractResourceNameFromUrl(uri)
-	fileName = sanitize.Path(fileName)
 	fileName = filepath.Join(folder, fileName)
-
+	fileName = sanitize.Path(fileName)
 	logger.Debug.Println("Local resource path : " + fileName)
-
 	tmpFilename := fileName + ".part"
 	resourceName := filepath.Base(folder) + " - " + filepath.Base(fileName)
 	defer removeTempFile(tmpFilename)
