@@ -54,7 +54,7 @@ func download(uri string, folder string, httpClient *http.Client, fileName strin
 	defer removeTempFile(tmpFilename)
 
 	if !pathExists(fileName) {
-		logger.Info.Println("New resource available : " + resourceName)
+		logger.Debug.Println("New resource available : " + resourceName)
 		// TODO: check file existence first with io.IsExist
 		output, err := os.Create(tmpFilename)
 		if err != nil {
@@ -79,7 +79,7 @@ func download(uri string, folder string, httpClient *http.Client, fileName strin
 			return fileName, err, newEpisode
 
 		}
-		logger.Info.Println("Resource downloaded : " + resourceName + " (" + bytefmt.ByteSize(uint64(n)) + ")")
+		logger.Debug.Println("Resource downloaded : " + resourceName + " (" + bytefmt.ByteSize(uint64(n)) + ")")
 		os.Rename(tmpFilename, fileName)
 		newEpisode = true
 

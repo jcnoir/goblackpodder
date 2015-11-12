@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	rss "github.com/jteeuwen/go-pkg-rss"
 	cobra "github.com/spf13/cobra"
@@ -37,6 +38,8 @@ var (
 	httpClient       *http.Client
 	maxCommentSize   int
 	retagExisting    bool
+	episodeLifeTime  int
+	dateFormat       string
 )
 
 type episodeTask struct {
@@ -58,9 +61,11 @@ func fetchPodcasts() {
 	maxRetryDownload = viper.GetInt("maxRetryDownload")
 	maxCommentSize = viper.GetInt("maxCommentSize")
 	retagExisting = viper.GetBool("retagExisting")
+	episodeLifeTime = viper.GetInt("daysToKeep")
+	dateFormat = viper.GetString("dateFormat")
 
 	logger = NewLogger(verbose)
-	logger.Info.Println("Podcast Update ...")
+	logger.Info.Println("Podcast Update")
 
 	if verbose {
 		viper.Debug()
@@ -102,7 +107,6 @@ func fetchPodcasts() {
 	logger.Debug.Println("Feeds : ", feeds)
 	if err == nil {
 		for _, feed := range feeds {
-			logger.Debug.Println("Adding podcast url in the pipe : " + feed)
 			feedTasks <- feed
 		}
 	} else {
@@ -114,7 +118,7 @@ func fetchPodcasts() {
 	wg.Wait()
 	close(newEpisodes)
 	processNewEpisodes()
-	logger.Info.Println("Podcast Update Completed")
+	logger.Info.Println("Podcasts Updated")
 }
 
 func processNewEpisodes() {
@@ -155,7 +159,7 @@ func main() {
 	}
 	readConfig()
 	rootCmd.Execute()
-
+	removeOldEpisodes()
 }
 
 func downloadFeed(url string) {
@@ -196,12 +200,13 @@ func chanHandler(feed *rss.Feed, newchannels []*rss.Channel) {
 func process(episode *Episode) {
 	selectedEnclosure := episode.enclosure
 	if !pathExists(episode.file()) {
-		logger.Debug.Println("Downloading episode ", episode.enclosure.Url)
+		logger.Info.Println("New episode available : " + episode.Podcast.feedPodcast.Title + " | " + episode.feedEpisode.Title)
 		file, err, newEpisode := downloadFromUrl(selectedEnclosure.Url, episode.Podcast.dir(), maxRetryDownload, httpClient, filepath.Base(episode.file()))
 		if err != nil {
 			logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
 		} else {
 			if newEpisode {
+				logger.Info.Println("New episode downloaded : " + episode.Podcast.feedPodcast.Title + " | " + episode.feedEpisode.Title)
 				completeTags(episode)
 				newEpisodes <- file
 			}
@@ -251,6 +256,8 @@ func readConfig() {
 	addProperty("maxRetryDownload", "k", 3, "Max http retries")
 	addProperty("maxCommentSize", "l", 500, "Max comment length")
 	addProperty("retagExisting", "r", false, "Retag existing episodes")
+	addProperty("daysToKeep", "t", 0, "Episode lifetime in days (0 to keep episodes forever)")
+	addProperty("dateFormat", "m", "020106", "Date format to be used in tags based on this reference date : Mon Jan _2 15:04:05 2006")
 
 	err := viper.ReadInConfig()
 	if err != nil {
@@ -273,4 +280,25 @@ func addProperty(name string, short string, defaultValue interface{}, descriptio
 	viper.SetDefault(name, defaultValue)
 	viper.BindPFlag(name, rootCmd.Flags().Lookup(name))
 
+}
+
+func removeOldEpisode(path string, f os.FileInfo, err error) error {
+	if !f.IsDir() && strings.HasPrefix(f.Name(), EPISODE_PREFIX) {
+		age := int(time.Now().Sub(f.ModTime()).Hours()) / (24)
+		logger.Debug.Println("Checking episode age : " + f.Name() + " : " + strconv.Itoa(age) + " days")
+		if age > episodeLifeTime {
+			logger.Info.Println("This episode will be removed since it is older (" + strconv.Itoa(age) + " days) than the configured episode lifetime (" + strconv.Itoa(episodeLifeTime) + " days) " + f.Name())
+			err := os.Remove(path)
+			if err != nil {
+				logger.Error.Println("Cannot remove episode file : "+path, err)
+			}
+		}
+	}
+	return nil
+}
+
+func removeOldEpisodes() {
+	if episodeLifeTime > 0 {
+		filepath.Walk(targetFolder, removeOldEpisode)
+	}
 }

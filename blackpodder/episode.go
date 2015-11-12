@@ -8,6 +8,8 @@ import (
 	"github.com/kennygrant/sanitize"
 )
 
+const EPISODE_PREFIX string = "blp-"
+
 type Episode struct {
 	feedEpisode *rss.Item
 	Podcast     *Podcast
@@ -28,19 +30,23 @@ func (e Episode) selectEnclosure() *rss.Enclosure {
 }
 
 func (e Episode) pubDate() string {
+	return e.formattedPubDate("060102")
+}
+
+func (e Episode) formattedPubDate(format string) string {
 	var episodeTimeStr string
 	episodeTime, converr := e.feedEpisode.ParsedPubDate()
 	if converr != nil {
 		episodeTimeStr = e.feedEpisode.PubDate
 	} else {
-		episodeTimeStr = episodeTime.Format("060102")
+		episodeTimeStr = episodeTime.Format(format)
 	}
 	return episodeTimeStr
 }
 
 func (e Episode) file() string {
 
-	fileNamePrefix := "BLP_" + e.pubDate() + "_"
+	fileNamePrefix := EPISODE_PREFIX + e.pubDate() + "-"
 	return filepath.Join(e.Podcast.dir(), sanitize.Path(fileNamePrefix+extractResourceNameFromUrl(e.enclosure.Url)))
 }
 

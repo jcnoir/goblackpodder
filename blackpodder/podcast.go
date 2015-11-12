@@ -38,6 +38,7 @@ func (podcast Podcast) convertedImage() string {
 func (podcast Podcast) downloadImage() {
 	if len(podcast.feedPodcast.Image.Url) > 0 {
 		if !pathExists(podcast.image()) {
+			logger.Info.Println("Cover available for podcast : " + podcast.feedPodcast.Title)
 			logger.Debug.Println("Downloading image : " + podcast.feedPodcast.Image.Url)
 			_, err, _ := downloadFromUrl(podcast.feedPodcast.Image.Url, podcast.dir(), maxRetryDownload, httpClient, filepath.Base(podcast.image()))
 			if err == nil {

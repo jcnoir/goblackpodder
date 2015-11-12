@@ -9,7 +9,7 @@ import (
 
 func completeTags(episode *Episode) {
 
-	logger.Info.Println("Tag update : " + episode.Podcast.feedPodcast.Title + " - " + episode.feedEpisode.Title + " : " + episode.file())
+	logger.Debug.Println("Tag update : " + episode.Podcast.feedPodcast.Title + " - " + episode.feedEpisode.Title + " : " + episode.file())
 
 	tag, err := taglib.Read(episode.file())
 	if err != nil {
@@ -36,7 +36,7 @@ func completeTags(episode *Episode) {
 	}
 
 	completeTag(taglib.Comments, episode.feedEpisode.Description, tag)
-	completeTag(taglib.Title, episode.feedEpisode.Title +" " +episode.pubDate(), tag)
+	completeTag(taglib.Title, episode.feedEpisode.Title+" "+episode.formattedPubDate(dateFormat), tag)
 	completeTag(taglib.Genre, "Podcast", tag)
 
 	pubdate, err := episode.feedEpisode.ParsedPubDate()
@@ -49,10 +49,10 @@ func completeTags(episode *Episode) {
 	if err != nil {
 		logger.Warning.Println(episode.Podcast.feedPodcast.Title+" - "+episode.feedEpisode.Title+" : Cannot save the modified tags", err)
 	}
-	logger.Info.Println("Tag update END : " + episode.Podcast.feedPodcast.Title + " - " + episode.feedEpisode.Title)
+	logger.Debug.Println("Tag update END : " + episode.Podcast.feedPodcast.Title + " - " + episode.feedEpisode.Title)
 
 }
 func completeTag(tagname taglib.TagName, tagvalue string, tag *taglib.File) {
-	logger.Info.Println(tagname.String() + " --> " + tagvalue)
+	logger.Debug.Println(tagname.String() + " --> " + tagvalue)
 	tag.SetTag(tagname, tagvalue)
 }
