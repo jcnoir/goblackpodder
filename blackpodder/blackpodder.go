@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"os"
 	"os/user"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	rss "github.com/jteeuwen/go-pkg-rss"
 	cobra "github.com/spf13/cobra"
@@ -26,6 +27,7 @@ var (
 	targetFolder     string
 	feedsPath        string
 	maxEpisodes      int
+	keptEpisodes     int
 	verbose          bool
 	maxFeedRunner    int
 	maxImageRunner   int
@@ -38,7 +40,6 @@ var (
 	httpClient       *http.Client
 	maxCommentSize   int
 	retagExisting    bool
-	episodeLifeTime  int
 	dateFormat       string
 )
 
@@ -61,8 +62,8 @@ func fetchPodcasts() {
 	maxRetryDownload = viper.GetInt("maxRetryDownload")
 	maxCommentSize = viper.GetInt("maxCommentSize")
 	retagExisting = viper.GetBool("retagExisting")
-	episodeLifeTime = viper.GetInt("daysToKeep")
 	dateFormat = viper.GetString("dateFormat")
+	keptEpisodes = int(math.Max(float64(viper.GetInt("keptEpisodes")), float64(maxEpisodes)))
 
 	logger = NewLogger(verbose)
 	logger.Info.Println("Podcast Update")
@@ -256,8 +257,8 @@ func readConfig() {
 	addProperty("maxRetryDownload", "k", 3, "Max http retries")
 	addProperty("maxCommentSize", "l", 500, "Max comment length")
 	addProperty("retagExisting", "r", false, "Retag existing episodes")
-	addProperty("daysToKeep", "t", 0, "Episode lifetime in days (0 to keep episodes forever)")
 	addProperty("dateFormat", "m", "020106", "Date format to be used in tags based on this reference date : Mon Jan _2 15:04:05 2006")
+	addProperty("keptEpisodes", "n", 3, "Number of episodes to keep (0 or -1 means no old episode remval)")
 
 	err := viper.ReadInConfig()
 	if err != nil {
@@ -282,23 +283,36 @@ func addProperty(name string, short string, defaultValue interface{}, descriptio
 
 }
 
-func removeOldEpisode(path string, f os.FileInfo, err error) error {
-	if !f.IsDir() && strings.HasPrefix(f.Name(), EPISODE_PREFIX) {
-		age := int(time.Now().Sub(f.ModTime()).Hours()) / (24)
-		logger.Debug.Println("Checking episode age : " + f.Name() + " : " + strconv.Itoa(age) + " days")
-		if age > episodeLifeTime {
-			logger.Info.Println("This episode will be removed since it is older (" + strconv.Itoa(age) + " days) than the configured episode lifetime (" + strconv.Itoa(episodeLifeTime) + " days) " + f.Name())
-			err := os.Remove(path)
-			if err != nil {
-				logger.Error.Println("Cannot remove episode file : "+path, err)
+func keepOnlyEpisodes(path string, f os.FileInfo, err error) error {
+	if f.IsDir() {
+		var episodeFiles []os.FileInfo
+		files, _ := ioutil.ReadDir(path)
+		for _, f := range files {
+			if strings.HasPrefix(f.Name(), EPISODE_PREFIX) {
+				episodeFiles = append(episodeFiles, f)
+			}
+		}
+		sort.Sort(ByModDate(episodeFiles))
+		for i, f := range episodeFiles {
+			if i >= keptEpisodes {
+				filePath := filepath.Join(path, f.Name())
+				logger.Info.Println("Remove old episode : " + filePath + " (Keep only " + strconv.Itoa(keptEpisodes) + " episodes)")
+				os.Remove(filePath)
 			}
 		}
 	}
 	return nil
 }
 
+type ByModDate []os.FileInfo
+
+func (a ByModDate) Len() int           { return len(a) }
+func (a ByModDate) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByModDate) Less(i, j int) bool { return a[i].ModTime().Unix() > a[j].ModTime().Unix() }
+
 func removeOldEpisodes() {
-	if episodeLifeTime > 0 {
-		filepath.Walk(targetFolder, removeOldEpisode)
+	if keptEpisodes > 0 {
+		filepath.Walk(targetFolder, keepOnlyEpisodes)
 	}
+
 }

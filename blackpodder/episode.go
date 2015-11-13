@@ -50,6 +50,10 @@ func (e Episode) file() string {
 	return filepath.Join(e.Podcast.dir(), sanitize.Path(fileNamePrefix+extractResourceNameFromUrl(e.enclosure.Url)))
 }
 
+func (e Episode) String() string {
+	return e.Podcast.feedPodcast.Title + " | " + e.feedEpisode.Title
+}
+
 func NewEpisode(feedEpisode *rss.Item, Podcast *Podcast) *Episode {
 	e := new(Episode)
 	e.feedEpisode = feedEpisode
