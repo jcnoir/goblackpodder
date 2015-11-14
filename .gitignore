@@ -1,2 +1,5 @@
 bin/
 blackpodder/blackpodder
+.idea/
+blackpodder/blackpodder.iml
+blackpodder/out/
