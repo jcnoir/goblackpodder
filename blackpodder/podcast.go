@@ -2,8 +2,13 @@ package main
 
 import (
 	"image"
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
 
 	rss "github.com/jteeuwen/go-pkg-rss"
 	"github.com/kennygrant/sanitize"
@@ -12,6 +17,7 @@ import (
 type Podcast struct {
 	baseFolder  string
 	feedPodcast *rss.Channel
+	wg          *sync.WaitGroup
 }
 
 func (podcast Podcast) dir() (path string) {
@@ -62,5 +68,87 @@ func (podcast Podcast) convertImage() error {
 		}
 	}
 	return err
-
 }
+
+func NewPodcast(baseFolder string, feedPodcast *rss.Channel) *Podcast {
+	var wg sync.WaitGroup
+	p := new(Podcast)
+	p.baseFolder = baseFolder
+	p.feedPodcast = feedPodcast
+	p.wg = &wg
+	return p
+}
+
+func (podcast Podcast) fetchNewEpisodes(newitems []*rss.Item) {
+	podcast.mkdir()
+	podcast.downloadImage()
+
+	episodeCounter := 0
+
+	for _, item := range newitems {
+		episode := NewEpisode(item, &podcast)
+		selectedEnclosure := episode.enclosure
+		if selectedEnclosure != nil {
+			if len(episode.feedEpisode.Enclosures) > 0 {
+				episodeCounter += 1
+				podcast.wg.Add(1)
+				episodeTasks <- episode
+				if episodeCounter >= maxEpisodes {
+					break
+				}
+			}
+		} else {
+			logger.Debug.Println("No audio found for episode " + podcast.feedPodcast.Title + " - " + item.Title)
+		}
+	}
+	logger.Debug.Println("Wait for all episodes to be processed : " + podcast.feedPodcast.Title)
+	podcast.wg.Wait()
+	podcast.removeOldEpisodes()
+}
+
+func process(episode *Episode) {
+	defer episode.Podcast.wg.Done()
+	selectedEnclosure := episode.enclosure
+	if !pathExists(episode.file()) {
+		logger.Info.Println("New episode available : " + episode.Podcast.feedPodcast.Title + " | " + episode.feedEpisode.Title)
+		file, err, newEpisode := downloadFromUrl(selectedEnclosure.Url, episode.Podcast.dir(), maxRetryDownload, httpClient, filepath.Base(episode.file()))
+		if err != nil {
+			logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
+		} else {
+			if newEpisode {
+				logger.Info.Println("New episode downloaded : " + episode.Podcast.feedPodcast.Title + " | " + episode.feedEpisode.Title)
+				completeTags(episode)
+				newEpisodes <- file
+			}
+		}
+	}
+	if retagExisting {
+		completeTags(episode)
+	}
+}
+
+func (p Podcast) removeOldEpisodes() {
+	if keptEpisodes > 0 {
+		var episodeFiles []os.FileInfo
+		files, _ := ioutil.ReadDir(p.dir())
+		for _, f := range files {
+			if strings.HasPrefix(f.Name(), EPISODE_PREFIX) {
+				episodeFiles = append(episodeFiles, f)
+			}
+		}
+		sort.Sort(ByModDate(episodeFiles))
+		for i, f := range episodeFiles {
+			if i >= keptEpisodes {
+				filePath := filepath.Join(p.dir(), f.Name())
+				logger.Info.Println("Remove old episode : " + filePath + " (Keep only " + strconv.Itoa(keptEpisodes) + " episodes)")
+				os.Remove(filePath)
+			}
+		}
+	}
+}
+
+type ByModDate []os.FileInfo
+
+func (a ByModDate) Len() int           { return len(a) }
+func (a ByModDate) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByModDate) Less(i, j int) bool { return a[i].ModTime().Unix() > a[j].ModTime().Unix() }

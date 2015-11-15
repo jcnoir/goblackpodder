@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,7 +21,6 @@ import (
 
 var (
 	logger           Logger
-	wg               sync.WaitGroup
 	feedWg           sync.WaitGroup
 	targetFolder     string
 	feedsPath        string
@@ -95,9 +93,7 @@ func fetchPodcasts() {
 	}
 
 	for i := 0; i < maxEpisodeRunner; i++ {
-		wg.Add(1)
 		go func() {
-			defer wg.Done()
 			for episodeTask := range episodeTasks {
 				process(episodeTask)
 			}
@@ -114,9 +110,9 @@ func fetchPodcasts() {
 		logger.Error.Println("Cannot parse feed file : ", err)
 	}
 	close(feedTasks)
+	logger.Debug.Println("Wait for all feeds to be processed ...")
 	feedWg.Wait()
 	close(episodeTasks)
-	wg.Wait()
 	close(newEpisodes)
 	processNewEpisodes()
 	logger.Info.Println("Podcasts Updated")
@@ -160,7 +156,6 @@ func main() {
 	}
 	readConfig()
 	rootCmd.Execute()
-	removeOldEpisodes()
 }
 
 func downloadFeed(url string) {
@@ -171,51 +166,11 @@ func downloadFeed(url string) {
 func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 
 	logger.Debug.Println(strconv.Itoa(len(newitems)) + " available episodes for " + ch.Title)
-
-	podcast := Podcast{targetFolder, ch}
-	podcast.mkdir()
-	podcast.downloadImage()
-
-	episodeCounter := 0
-
-	for _, item := range newitems {
-		episode := NewEpisode(item, &podcast)
-		selectedEnclosure := episode.enclosure
-		if selectedEnclosure != nil {
-			if len(episode.feedEpisode.Enclosures) > 0 {
-				episodeCounter += 1
-				episodeTasks <- episode
-				if episodeCounter >= maxEpisodes {
-					break
-				}
-			}
-		} else {
-			logger.Debug.Println("No audio found for episode " + ch.Title + " - " + item.Title)
-		}
-	}
+	podcast := NewPodcast(targetFolder, ch)
+	podcast.fetchNewEpisodes(newitems)
 }
 
 func chanHandler(feed *rss.Feed, newchannels []*rss.Channel) {
-}
-
-func process(episode *Episode) {
-	selectedEnclosure := episode.enclosure
-	if !pathExists(episode.file()) {
-		logger.Info.Println("New episode available : " + episode.Podcast.feedPodcast.Title + " | " + episode.feedEpisode.Title)
-		file, err, newEpisode := downloadFromUrl(selectedEnclosure.Url, episode.Podcast.dir(), maxRetryDownload, httpClient, filepath.Base(episode.file()))
-		if err != nil {
-			logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
-		} else {
-			if newEpisode {
-				logger.Info.Println("New episode downloaded : " + episode.Podcast.feedPodcast.Title + " | " + episode.feedEpisode.Title)
-				completeTags(episode)
-				newEpisodes <- file
-			}
-		}
-	}
-	if retagExisting {
-		completeTags(episode)
-	}
 }
 
 func parseFeeds(filePath string) ([]string, error) {
@@ -280,39 +235,5 @@ func addProperty(name string, short string, defaultValue interface{}, descriptio
 	}
 	viper.SetDefault(name, defaultValue)
 	viper.BindPFlag(name, rootCmd.Flags().Lookup(name))
-
-}
-
-func keepOnlyEpisodes(path string, f os.FileInfo, err error) error {
-	if f.IsDir() {
-		var episodeFiles []os.FileInfo
-		files, _ := ioutil.ReadDir(path)
-		for _, f := range files {
-			if strings.HasPrefix(f.Name(), EPISODE_PREFIX) {
-				episodeFiles = append(episodeFiles, f)
-			}
-		}
-		sort.Sort(ByModDate(episodeFiles))
-		for i, f := range episodeFiles {
-			if i >= keptEpisodes {
-				filePath := filepath.Join(path, f.Name())
-				logger.Info.Println("Remove old episode : " + filePath + " (Keep only " + strconv.Itoa(keptEpisodes) + " episodes)")
-				os.Remove(filePath)
-			}
-		}
-	}
-	return nil
-}
-
-type ByModDate []os.FileInfo
-
-func (a ByModDate) Len() int           { return len(a) }
-func (a ByModDate) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByModDate) Less(i, j int) bool { return a[i].ModTime().Unix() > a[j].ModTime().Unix() }
-
-func removeOldEpisodes() {
-	if keptEpisodes > 0 {
-		filepath.Walk(targetFolder, keepOnlyEpisodes)
-	}
 
 }
