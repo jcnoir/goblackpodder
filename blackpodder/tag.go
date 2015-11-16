@@ -1,11 +1,18 @@
 package main
 
 import (
+	"os/exec"
 	"strconv"
+	"sync"
 
 	"github.com/jaytaylor/html2text"
 	"github.com/wtolson/go-taglib"
 )
+
+type EpisodeTag struct {
+}
+
+var execWg sync.WaitGroup
 
 func completeTags(episode *Episode) {
 
@@ -19,8 +26,8 @@ func completeTags(episode *Episode) {
 	defer tag.Close()
 
 	var replaceArtist string
-	if episode.Podcast.feedPodcast.Author.Name != "" {
-		replaceArtist = episode.Podcast.feedPodcast.Author.Name
+	if episode.feedEpisode.Author.Name != "" {
+		replaceArtist = episode.feedEpisode.Author.Name
 	} else {
 		replaceArtist = episode.Podcast.feedPodcast.Title
 	}
@@ -45,6 +52,8 @@ func completeTags(episode *Episode) {
 	}
 	logger.Debug.Println("Tag Write Start for : " + episode.file())
 	err = tag.Save()
+	setAlbumArtist(episode.Podcast.feedPodcast.Title, episode.file())
+
 	logger.Debug.Println("Tag Write End for : " + episode.file())
 	if err != nil {
 		logger.Warning.Println(episode.Podcast.feedPodcast.Title+" - "+episode.feedEpisode.Title+" : Cannot save the modified tags", err)
@@ -55,4 +64,17 @@ func completeTags(episode *Episode) {
 func completeTag(tagname taglib.TagName, tagvalue string, tag *taglib.File) {
 	logger.Debug.Println(tagname.String() + " --> " + tagvalue)
 	tag.SetTag(tagname, tagvalue)
+}
+
+func setAlbumArtist(albumartist string, filepath string) {
+	cmd := exec.Command("eyeD3", "--text-frame=TPE2:"+albumartist, filepath)
+	logger.Debug.Println("Command to be executed : ", cmd.Args)
+	err := cmd.Run()
+	if err != nil {
+		cmd := exec.Command("eyeD3", "--set-text-frame=TPE2:"+albumartist, filepath)
+		err = cmd.Run()
+		if err != nil {
+			logger.Error.Println("Cannot set albumartist tag : ", err)
+		}
+	}
 }
