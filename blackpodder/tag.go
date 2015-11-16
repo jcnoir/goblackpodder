@@ -31,6 +31,10 @@ func completeTags(episode *Episode) {
 	} else {
 		replaceArtist = episode.Podcast.feedPodcast.Title
 	}
+	
+	//use the podcast title for now
+	replaceArtist = episode.Podcast.feedPodcast.Title
+	
 	completeTag(taglib.Artist, replaceArtist, tag)
 	completeTag(taglib.Album, episode.Podcast.feedPodcast.Title, tag)
 
@@ -52,7 +56,7 @@ func completeTags(episode *Episode) {
 	}
 	logger.Debug.Println("Tag Write Start for : " + episode.file())
 	err = tag.Save()
-	setAlbumArtist(episode.Podcast.feedPodcast.Title, episode.file())
+	//setAlbumArtist(episode.Podcast.feedPodcast.Title, episode.file())
 
 	logger.Debug.Println("Tag Write End for : " + episode.file())
 	if err != nil {
