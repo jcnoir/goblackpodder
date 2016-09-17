@@ -14,6 +14,7 @@ import (
 	"github.com/kennygrant/sanitize"
 )
 
+// Podcast is a poscast
 type Podcast struct {
 	baseFolder  string
 	feedPodcast *rss.Channel
@@ -31,7 +32,7 @@ func (podcast Podcast) mkdir() error {
 }
 
 func (podcast Podcast) image() string {
-	imageName := extractResourceNameFromUrl(podcast.feedPodcast.Image.Url)
+	imageName := extractResourceNameFromURL(podcast.feedPodcast.Image.Url)
 	imageName = sanitize.Path(imageName)
 
 	return filepath.Join(podcast.dir(), imageName)
@@ -46,7 +47,7 @@ func (podcast Podcast) downloadImage() {
 		if !pathExists(podcast.image()) {
 			logger.Info.Println("Cover available for podcast : " + podcast.feedPodcast.Title)
 			logger.Debug.Println("Downloading image : " + podcast.feedPodcast.Image.Url)
-			_, err, _ := downloadFromUrl(podcast.feedPodcast.Image.Url, podcast.dir(), maxRetryDownload, httpClient, filepath.Base(podcast.image()))
+			_, _, err := downloadFromURL(podcast.feedPodcast.Image.Url, podcast.dir(), maxRetryDownload, httpClient, filepath.Base(podcast.image()))
 			if err == nil {
 				podcast.convertImage()
 			} else {
@@ -70,6 +71,7 @@ func (podcast Podcast) convertImage() error {
 	return err
 }
 
+//NewPodcast makes a new podcast
 func NewPodcast(baseFolder string, feedPodcast *rss.Channel) *Podcast {
 	var wg sync.WaitGroup
 	p := new(Podcast)
@@ -90,7 +92,7 @@ func (podcast Podcast) fetchNewEpisodes(newitems []*rss.Item) {
 		selectedEnclosure := episode.enclosure
 		if selectedEnclosure != nil {
 			if len(episode.feedEpisode.Enclosures) > 0 {
-				episodeCounter += 1
+				episodeCounter++
 				podcast.wg.Add(1)
 				episodeTasks <- episode
 				if episodeCounter >= maxEpisodes {
@@ -111,7 +113,7 @@ func process(episode *Episode) {
 	selectedEnclosure := episode.enclosure
 	if !pathExists(episode.file()) {
 		logger.Info.Println("New episode available : " + episode.Podcast.feedPodcast.Title + " | " + episode.feedEpisode.Title)
-		file, err, newEpisode := downloadFromUrl(selectedEnclosure.Url, episode.Podcast.dir(), maxRetryDownload, httpClient, filepath.Base(episode.file()))
+		file, newEpisode, err := downloadFromURL(selectedEnclosure.Url, episode.Podcast.dir(), maxRetryDownload, httpClient, filepath.Base(episode.file()))
 		if err != nil {
 			logger.Error.Println("Episode download failure : "+selectedEnclosure.Url, err)
 		} else {
@@ -127,19 +129,20 @@ func process(episode *Episode) {
 	}
 }
 
-func (p Podcast) removeOldEpisodes() {
+//removeOldEpisodes remove old podcast epipsode files
+func (podcast Podcast) removeOldEpisodes() {
 	if keptEpisodes > 0 {
 		var episodeFiles []os.FileInfo
-		files, _ := ioutil.ReadDir(p.dir())
+		files, _ := ioutil.ReadDir(podcast.dir())
 		for _, f := range files {
-			if strings.HasPrefix(f.Name(), EPISODE_PREFIX) {
+			if strings.HasPrefix(f.Name(), EpisodePrefix) {
 				episodeFiles = append(episodeFiles, f)
 			}
 		}
 		sort.Sort(ByModDate(episodeFiles))
 		for i, f := range episodeFiles {
 			if i >= keptEpisodes {
-				filePath := filepath.Join(p.dir(), f.Name())
+				filePath := filepath.Join(podcast.dir(), f.Name())
 				logger.Info.Println("Remove old episode : " + filePath + " (Keep only " + strconv.Itoa(keptEpisodes) + " episodes)")
 				os.Remove(filePath)
 			}
@@ -147,6 +150,7 @@ func (p Podcast) removeOldEpisodes() {
 	}
 }
 
+//ByModDate sorts by modification date
 type ByModDate []os.FileInfo
 
 func (a ByModDate) Len() int           { return len(a) }

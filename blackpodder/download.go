@@ -13,39 +13,39 @@ import (
 	"github.com/pivotal-golang/bytefmt"
 )
 
-func downloadFromUrl(url string, folder string, maxretry int, httpClient *http.Client, fileName string) (path string, err error, newEpisode bool) {
+func downloadFromURL(url string, folder string, maxretry int, httpClient *http.Client, fileName string) (path string, newEpisode bool, err error) {
 
 	for i := 1; i <= maxretry; i++ {
-		path, err, newEpisode = download(url, folder, httpClient, fileName)
+		path, newEpisode, err = download(url, folder, httpClient, fileName)
 		if err == nil {
 			break
 		} else {
 			logger.Warning.Println("Download failure at attempt "+strconv.Itoa(i)+"/"+strconv.Itoa(maxretry)+" for url "+url, err)
 		}
 	}
-	return path, err, newEpisode
+	return path, newEpisode, err
 }
 
-func downloadFromUrlWithoutName(url string, folder string, maxretry int, httpClient *http.Client) (path string, err error, newEpisode bool) {
-	fileName := extractResourceNameFromUrl(url)
-	return downloadFromUrl(url, folder, maxretry, httpClient, fileName)
+func downloadFromURLWithoutName(url string, folder string, maxretry int, httpClient *http.Client) (path string, newEpisode bool, err error) {
+	fileName := extractResourceNameFromURL(url)
+	return downloadFromURL(url, folder, maxretry, httpClient, fileName)
 }
 
-func extractResourceNameFromUrl(uri string) string {
+func extractResourceNameFromURL(uri string) string {
 	var urlPath string
-	parsedUrl, err := url.Parse(uri)
+	parsedURL, err := url.Parse(uri)
 	if err != nil {
 		logger.Warning.Println("Cannot extract path from url : "+uri+" : ", err)
 		urlPath = uri
 	} else {
-		urlPath = parsedUrl.Path
+		urlPath = parsedURL.Path
 	}
 	tokens := strings.Split(urlPath, "/")
 	resource := tokens[len(tokens)-1]
 	return resource
 }
 
-func download(uri string, folder string, httpClient *http.Client, fileName string) (path string, err error, newEpisode bool) {
+func download(uri string, folder string, httpClient *http.Client, fileName string) (path string, newEpisode bool, err error) {
 	fileName = filepath.Join(folder, fileName)
 	fileName = sanitize.Path(fileName)
 	logger.Debug.Println("Local resource path : " + fileName)
@@ -58,25 +58,25 @@ func download(uri string, folder string, httpClient *http.Client, fileName strin
 		// TODO: check file existence first with io.IsExist
 		output, err := os.Create(tmpFilename)
 		if err != nil {
-			return fileName, err, newEpisode
+			return fileName, newEpisode, err
 
 		}
 		defer output.Close()
 		req, err := http.NewRequest("GET", uri, nil)
 		if err != nil {
-			return fileName, err, newEpisode
+			return fileName, newEpisode, err
 
 		}
 		req.Close = true
 		response, err := httpClient.Do(req)
 		if err != nil {
-			return fileName, err, newEpisode
+			return fileName, newEpisode, err
 
 		}
 		defer response.Body.Close()
 		n, err := io.Copy(output, response.Body)
 		if err != nil {
-			return fileName, err, newEpisode
+			return fileName, newEpisode, err
 
 		}
 		logger.Debug.Println("Resource downloaded : " + resourceName + " (" + bytefmt.ByteSize(uint64(n)) + ")")
@@ -88,7 +88,7 @@ func download(uri string, folder string, httpClient *http.Client, fileName strin
 		newEpisode = false
 	}
 
-	return fileName, err, newEpisode
+	return fileName, newEpisode, err
 }
 
 func removeTempFile(tmpFilename string) {

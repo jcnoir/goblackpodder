@@ -10,6 +10,7 @@ import (
 	"os"
 )
 
+// ImageRead makes image from file path
 func ImageRead(ImageFile string) (myImage image.Image, err error) {
 	// open "test.jpg"
 	file, err := os.Open(ImageFile)
@@ -19,12 +20,14 @@ func ImageRead(ImageFile string) (myImage image.Image, err error) {
 	return img, err
 }
 
+//Formatpng encodes the image
 func Formatpng(img image.Image, filepath string) (err error) {
 	out, err := os.Create(filepath)
 	defer out.Close()
 	return png.Encode(out, img)
 }
 
+//Formatjpg encodes the image
 func Formatjpg(img image.Image, filepath string) (err error) {
 	out, err := os.Create(filepath)
 	defer out.Close()
@@ -32,6 +35,7 @@ func Formatjpg(img image.Image, filepath string) (err error) {
 
 }
 
+//Formatgif encodes the image
 func Formatgif(img image.Image, filepath string) (err error) {
 	out, err := os.Create(filepath)
 	defer out.Close()

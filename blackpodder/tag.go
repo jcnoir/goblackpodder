@@ -9,6 +9,7 @@ import (
 	"github.com/wtolson/go-taglib"
 )
 
+//EpisodeTag is a podcast episode tag
 type EpisodeTag struct {
 }
 
@@ -31,10 +32,10 @@ func completeTags(episode *Episode) {
 	} else {
 		replaceArtist = episode.Podcast.feedPodcast.Title
 	}
-	
+
 	//use the podcast title for now
 	replaceArtist = episode.Podcast.feedPodcast.Title
-	
+
 	completeTag(taglib.Artist, replaceArtist, tag)
 	completeTag(taglib.Album, episode.Podcast.feedPodcast.Title, tag)
 

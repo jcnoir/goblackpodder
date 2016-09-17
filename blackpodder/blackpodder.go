@@ -166,6 +166,20 @@ func downloadFeed(url string) {
 func itemHandler(feed *rss.Feed, ch *rss.Channel, newitems []*rss.Item) {
 
 	logger.Debug.Println(strconv.Itoa(len(newitems)) + " available episodes for " + ch.Title)
+	logger.Debug.Println("Channel : ", ch)
+	if ch.Title == "" {
+		if ch.Author.Name != "" {
+			ch.Title = ch.Author.Name
+		} else if ch.Description != "" {
+			ch.Title = ch.Description
+		} else {
+			ch.Title = extractResourceNameFromURL(feed.Url)
+		}
+
+		logger.Warning.Println("Missing podcast title in the feed, this replacement will be used : " + ch.Title)
+
+	}
+
 	podcast := NewPodcast(targetFolder, ch)
 	podcast.fetchNewEpisodes(newitems)
 }
@@ -175,8 +189,7 @@ func chanHandler(feed *rss.Feed, newchannels []*rss.Channel) {
 
 func parseFeeds(filePath string) ([]string, error) {
 	var lines []string
-	filteredLines := make([]string, 0)
-
+	var filteredLines []string
 	content, err := ioutil.ReadFile(filePath)
 	if err == nil {
 		lines = strings.Split(string(content), "\n")

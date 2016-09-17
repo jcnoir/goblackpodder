@@ -8,8 +8,10 @@ import (
 	"github.com/kennygrant/sanitize"
 )
 
-const EPISODE_PREFIX string = "blp-"
+//EpisodePrefix is the filename prefix for podcast episode
+const EpisodePrefix string = "blp-"
 
+//Episode is a podcast episode
 type Episode struct {
 	feedEpisode *rss.Item
 	Podcast     *Podcast
@@ -46,14 +48,15 @@ func (e Episode) formattedPubDate(format string) string {
 
 func (e Episode) file() string {
 
-	fileNamePrefix := EPISODE_PREFIX + e.pubDate() + "-"
-	return filepath.Join(e.Podcast.dir(), sanitize.Path(fileNamePrefix+extractResourceNameFromUrl(e.enclosure.Url)))
+	fileNamePrefix := EpisodePrefix + e.pubDate() + "-"
+	return filepath.Join(e.Podcast.dir(), sanitize.Path(fileNamePrefix+extractResourceNameFromURL(e.enclosure.Url)))
 }
 
 func (e Episode) String() string {
 	return e.Podcast.feedPodcast.Title + " | " + e.feedEpisode.Title
 }
 
+// NewEpisode makes a new podcast episode with feed informations
 func NewEpisode(feedEpisode *rss.Item, Podcast *Podcast) *Episode {
 	e := new(Episode)
 	e.feedEpisode = feedEpisode

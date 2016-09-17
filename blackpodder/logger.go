@@ -8,6 +8,7 @@ import (
 	"os"
 )
 
+//Logger is the logger entry point structure
 type Logger struct {
 	Debug   *log.Logger
 	Info    *log.Logger
@@ -15,6 +16,7 @@ type Logger struct {
 	Error   *log.Logger
 }
 
+//NewLogger makes a new logger
 func NewLogger(verbose bool) Logger {
 
 	var verboseOut io.Writer
