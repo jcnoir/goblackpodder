@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"sync"
 
+	"fmt"
+
 	"github.com/jaytaylor/html2text"
 	"github.com/wtolson/go-taglib"
 )
@@ -67,7 +69,7 @@ func completeTags(episode *Episode) {
 
 }
 func completeTag(tagname taglib.TagName, tagvalue string, tag *taglib.File) {
-	logger.Debug.Println(tagname.String() + " --> " + tagvalue)
+	logger.Debug.Println(fmt.Sprintf("tagname --> %s", tagvalue))
 	tag.SetTag(tagname, tagvalue)
 }
 

@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"code.cloudfoundry.org/bytefmt"
 	"github.com/kennygrant/sanitize"
-	"github.com/pivotal-golang/bytefmt"
 )
 
 func downloadFromURL(url string, folder string, maxretry int, httpClient *http.Client, fileName string) (path string, newEpisode bool, err error) {
