@@ -69,7 +69,7 @@ func completeTags(episode *Episode) {
 
 }
 func completeTag(tagname taglib.TagName, tagvalue string, tag *taglib.File) {
-	logger.Debug.Println(fmt.Sprintf("tagname --> %s", tagvalue))
+	logger.Debug.Println(fmt.Sprintf("Tag: %s --> %s", tagname.String(), tagvalue))
 	tag.SetTag(tagname, tagvalue)
 }
 
