@@ -3,3 +3,5 @@ blackpodder/blackpodder
 .idea/
 blackpodder/blackpodder.iml
 blackpodder/out/
+.vscode/
+debug

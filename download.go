@@ -11,6 +11,8 @@ import (
 
 	"code.cloudfoundry.org/bytefmt"
 	"github.com/kennygrant/sanitize"
+	"github.com/smira/go-ftp-protocol/protocol"
+	"regexp"
 )
 
 func downloadFromURL(url string, folder string, maxretry int, httpClient *http.Client, fileName string) (path string, newEpisode bool, err error) {
@@ -44,14 +46,25 @@ func extractResourceNameFromURL(uri string) string {
 	resource := tokens[len(tokens)-1]
 	return resource
 }
+/**
+Replace // with / in urls - except in http(s)://
+ */
+func cleanUrl(url string) (cleanUrl string){
+	re := regexp.MustCompile("([^:])(\\/\\/)")
+	cleanUrl = re.ReplaceAllString(url, "$1/")
+	return cleanUrl
+}
 
-func download(uri string, folder string, httpClient *http.Client, fileName string) (path string, newEpisode bool, err error) {
+func download(referenceUri string, folder string, httpClient *http.Client, fileName string) (path string, newEpisode bool, err error) {
 	fileName = filepath.Join(folder, fileName)
 	fileName = sanitize.Path(fileName)
+	uri := cleanUrl(referenceUri)
 	logger.Debug.Println("Local resource path : " + fileName)
 	tmpFilename := fileName + ".part"
 	resourceName := filepath.Base(folder) + " - " + filepath.Base(fileName)
 	defer removeTempFile(tmpFilename)
+	var resp* http.Response
+
 
 	if !pathExists(fileName) {
 		logger.Debug.Println("New resource available : " + resourceName)
@@ -62,24 +75,43 @@ func download(uri string, folder string, httpClient *http.Client, fileName strin
 
 		}
 		defer output.Close()
-		req, err := http.NewRequest("GET", uri, nil)
-		if err != nil {
-			return fileName, newEpisode, err
 
-		}
-		req.Close = true
-		response, err := httpClient.Do(req)
-		if err != nil {
-			return fileName, newEpisode, err
+		if strings.HasPrefix(uri, "ftp") {
+			logger.Debug.Println("FTP download detected")
+			transport := &http.Transport{}
+			transport.RegisterProtocol("ftp", &protocol.FTPRoundTripper{})
 
+			client := &http.Client{Transport: transport}
+			response, err := client.Get(uri)
+			if err != nil {
+				return fileName, newEpisode, err
+
+			}
+			resp = response
+		} else {
+
+			req, err := http.NewRequest("GET", uri, nil)
+			if err != nil {
+				return fileName, newEpisode, err
+
+			}
+			req.Close = true
+			response, err := httpClient.Do(req)
+			if err != nil {
+				return fileName, newEpisode, err
+
+			}
+			resp = response
+			defer response.Body.Close()
 		}
-		defer response.Body.Close()
-		n, err := io.Copy(output, response.Body)
+
+		n, err := io.Copy(output, resp.Body)
 		if err != nil {
 			return fileName, newEpisode, err
 
 		}
 		logger.Debug.Println("Resource downloaded : " + resourceName + " (" + bytefmt.ByteSize(uint64(n)) + ")")
+
 		os.Rename(tmpFilename, fileName)
 		newEpisode = true
 

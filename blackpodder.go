@@ -15,8 +15,8 @@ import (
 	"sync"
 
 	rss "github.com/jteeuwen/go-pkg-rss"
-	cobra "github.com/spf13/cobra"
-	viper "github.com/spf13/viper"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
