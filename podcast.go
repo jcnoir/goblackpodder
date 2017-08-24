@@ -119,7 +119,12 @@ func process(episode *Episode) {
 		} else {
 			if newEpisode {
 				logger.Info.Println("New episode downloaded : " + episode.Podcast.feedPodcast.Title + " | " + episode.feedEpisode.Title)
-				completeTags(episode)
+				if strings.Contains(episode.enclosure.Type, "ogg") {
+					logger.Warning.Println("Fixing tag has been disabled for ogg (file corruption)")
+
+				} else {
+					completeTags(episode)
+				}
 				newEpisodes <- file
 			}
 		}
