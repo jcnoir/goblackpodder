@@ -31,7 +31,7 @@ func Formatpng(img image.Image, filepath string) (err error) {
 func Formatjpg(img image.Image, filepath string) (err error) {
 	out, err := os.Create(filepath)
 	defer out.Close()
-	return jpeg.Encode(out, img, &jpeg.Options{100})
+	return jpeg.Encode(out, img, &jpeg.Options{Quality: 100})
 
 }
 

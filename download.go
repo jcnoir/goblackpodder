@@ -9,10 +9,11 @@ import (
 	"strconv"
 	"strings"
 
+	"regexp"
+
 	"code.cloudfoundry.org/bytefmt"
 	"github.com/kennygrant/sanitize"
 	"github.com/smira/go-ftp-protocol/protocol"
-	"regexp"
 )
 
 func downloadFromURL(url string, folder string, maxretry int, httpClient *http.Client, fileName string) (path string, newEpisode bool, err error) {
@@ -46,25 +47,25 @@ func extractResourceNameFromURL(uri string) string {
 	resource := tokens[len(tokens)-1]
 	return resource
 }
+
 /**
 Replace // with / in urls - except in http(s)://
- */
-func cleanUrl(url string) (cleanUrl string){
+*/
+func cleanURL(url string) (cleanURL string) {
 	re := regexp.MustCompile("([^:])(\\/\\/)")
-	cleanUrl = re.ReplaceAllString(url, "$1/")
-	return cleanUrl
+	cleanURL = re.ReplaceAllString(url, "$1/")
+	return cleanURL
 }
 
-func download(referenceUri string, folder string, httpClient *http.Client, fileName string) (path string, newEpisode bool, err error) {
+func download(referenceURI string, folder string, httpClient *http.Client, fileName string) (path string, newEpisode bool, err error) {
 	fileName = filepath.Join(folder, fileName)
 	fileName = sanitize.Path(fileName)
-	uri := cleanUrl(referenceUri)
+	uri := cleanURL(referenceURI)
 	logger.Debug.Println("Local resource path : " + fileName)
 	tmpFilename := fileName + ".part"
 	resourceName := filepath.Base(folder) + " - " + filepath.Base(fileName)
 	defer removeTempFile(tmpFilename)
-	var resp* http.Response
-
+	var resp *http.Response
 
 	if !pathExists(fileName) {
 		logger.Debug.Println("New resource available : " + resourceName)

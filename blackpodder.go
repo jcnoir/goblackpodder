@@ -230,7 +230,7 @@ func readConfig() {
 
 	err := viper.ReadInConfig()
 	if err != nil {
-		logger.Error.Println("Fatal error config file: %s \n", err)
+		logger.Error.Printf("Fatal error config file: %s \n", err)
 	}
 
 }
