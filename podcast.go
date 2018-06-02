@@ -43,19 +43,35 @@ func (podcast Podcast) convertedImage() string {
 }
 
 func (podcast Podcast) downloadImage() {
+	var err error
 	if len(podcast.feedPodcast.Image.Url) > 0 {
 		if !pathExists(podcast.image()) {
 			logger.Info.Println("Cover available for podcast : " + podcast.feedPodcast.Title)
 			logger.Debug.Println("Downloading image : " + podcast.feedPodcast.Image.Url)
 			_, _, err := downloadFromURL(podcast.feedPodcast.Image.Url, podcast.dir(), maxRetryDownload, httpClient, filepath.Base(podcast.image()))
 			if err == nil {
-				podcast.convertImage()
+				err = podcast.convertImage()
+				if err != nil {
+					logger.Error.Println("Podcast image conversion failure", err)
+				}
 			} else {
 				logger.Error.Println("Podcast image processing failure", err)
 			}
 		}
 	}
 
+	if !pathExists(podcast.convertedImage()) {
+		logger.Warning.Println("Podcast image has not been retrieved properly, using default image.")
+		err = useDefaultImage(podcast)
+		if err != nil {
+			logger.Error.Println("Default podcast image has not been retrieved properly.", err)
+		}
+	}
+
+}
+
+func useDefaultImage(podcast Podcast) error {
+	return copyFile(filepath.Join(podcast.baseFolder, "folder.jpg"), podcast.convertedImage())
 }
 
 func (podcast Podcast) convertImage() error {
